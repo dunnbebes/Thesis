@@ -3,6 +3,8 @@ import copy
 
 import datetime
 import plotly.figure_factory as ff
+import plotly.express as px
+
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
@@ -23,7 +25,6 @@ def plot(J, K, n_j, X_ijk, S_ij, C_ij, MB_record, t):
     for k in range(K):
         # Draw operations
         for j in range(J):
-            job_color = colors[j % len(colors)]
             for i in range(int(n_j[j])):
                 if X_ijk[i][j][k] == 1:
                     # Convert start and completion times to datetime objects
@@ -40,7 +41,6 @@ def plot(J, K, n_j, X_ijk, S_ij, C_ij, MB_record, t):
             gantt_data.append(dict(Task=f'Machine {k}', Start=dummy_start_time, Finish=dummy_end_time,
                                    Resource='No Job'))
         
-    
 
     # Creating the Gantt chart figure
     fig = ff.create_gantt(gantt_data, 
@@ -162,6 +162,7 @@ def pretty_table(J, I, n_j, X_ijk, S_ij, C_ij):
     }
 
     df = pd.DataFrame(data)
+    df = df[df['Start'] != -999]
     
     return df
 
@@ -173,3 +174,55 @@ def summarise(OSet, Title):
 
     print(Title)
     return df
+
+def plot_ganttchart(J, I, K, n_j, X_ijk, S_ij, C_ij, MB_record, t):
+    df = pretty_table(J, I, n_j, X_ijk, S_ij, C_ij)
+
+    # Convert start and end times from seconds to datetime
+    start_date = datetime.datetime(year=2024, month=7, day=1, hour=8, minute=0, second=0)
+    df['Start'] = pd.to_datetime(start_date + pd.to_timedelta(df['Start'], unit='s'))
+    df['End'] = pd.to_datetime(start_date + pd.to_timedelta(df['End'], unit='s'))
+
+    # Sort by Machine and then by Job ID
+    df.sort_values(by=['MC', 'Job'], inplace=True)
+
+    fig = px.timeline(df, x_start='Start', x_end='End', y='MC', color='Job', text='Job',
+                      labels={'MC': 'Machine', 'Job': 'Job ID'},
+                      title='Gantt Chart')
+
+    # Add machine breakdowns
+    for k in range(K):
+        if k in MB_record:
+            for MB_starttime, MB_endtime in MB_record[k]:
+                t1_datetime = start_date + datetime.timedelta(seconds=MB_starttime)
+                t2_datetime = start_date + datetime.timedelta(seconds=MB_endtime)
+                # Adjust vertical position for the machine, considering the sort order
+                position = df[df['MC'] == k].index[0]  # Get the position of the machine in the sorted list
+                fig.add_shape(
+                    type="rect",
+                    x0=t1_datetime,
+                    y0=position - 0.18,  # Adjust for the vertical position of the machine
+                    x1=t2_datetime,
+                    y1=position + 0.18,
+                    line=dict(color="black"),
+                    fillcolor="white",
+                    opacity=1)
+                fig.add_annotation(
+                    x=(t1_datetime + (t2_datetime - t1_datetime) / 2),
+                    y=position,
+                    text="X",
+                    showarrow=False,
+                    font=dict(size=10, color="black"),
+                    align="center",
+                    valign="middle")
+
+    vertical_line_time = start_date + datetime.timedelta(seconds=t)  
+    fig.add_shape(
+        type="line",
+        x0=vertical_line_time,
+        y0=-0.5,
+        x1=vertical_line_time,
+        y1=K - 0.5,
+        line=dict(color="black", dash="dash"))
+
+    return fig

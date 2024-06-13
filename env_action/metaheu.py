@@ -191,17 +191,17 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
                       MC_ji, n_MC_ji, OperationPool, maxtime):
     
     N                   = 50
-    max_Generation      = 50
+    max_Generation      = 500
     max_No_improve      = 10
     start_time          = time.time()
     GBest               = float('inf')
     crossover_rate      = 0.7
     mutation_rate       = 0.3
     tournament_size     = 3
-
-    fitness             = np.zeros((N))
+    
     A                   = np.repeat(OperationPool['Job'].values, OperationPool['Num operation left'].values)
     chromosome_len      = len(A)
+    fitness             = np.zeros(N)
 
     if chromosome_len >= 2:
         value_counts    = dict(zip(OperationPool['Job'], OperationPool['Num operation left']))
@@ -226,6 +226,8 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
             if LBest < GBest:
                 LB_id = np.argmin(fitness)
                 GBest      = LBest.copy()
+                print("check", LB_id)
+                print(population[LB_id])
                 G_OA       = population[LB_id][0].copy()
                 G_MS       = population[LB_id][1].copy()
                 no_improve = 0
@@ -257,3 +259,10 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
         GBest, C_j = evaluate_LocalCost(d_j, C_ij, JSet)
 
     return GBest, X_ijk, S_ij, C_ij, C_j
+
+def TabuSearch (J, I, K, JSet, OJSet, 
+                p_ijk, h_ijk, d_j, n_j, MC_ji, n_MC_ji,
+                X_ijk, S_ij, maxtime):
+    # Initialize solution
+    a = 1
+    

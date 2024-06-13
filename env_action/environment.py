@@ -36,13 +36,14 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		self.maxtime                 = copy.deepcopy(maxtime)
 		self.defectProb              = copy.deepcopy(defectProb)
 		self.pre_GBest               = copy.deepcopy(pre_GBest)
-		self.LB_Cmax                 = np.sum(np.mean(p_ijk*h_ijk, axis = 0))
+		self.LB_Cmax                 = np.sum(np.mean(p_ijk*h_ijk, axis= 2))
 
-		self.method_list 			 = ["exact", "GA", "LFOH", "LAPH", "LAP_LFO", "CDR1", "CDR2", "CDR4"]
+		self.method_list 			 = ["exact", "GA", "LFOH", "LAPH", "LAP_LFO", 
+						  				"CDR1", "CDR2", "CDR3", "CDR4", "CDR5", "CDR6"]
 
 		
 		# Example when using discrete actions:
-		self.action_space = spaces.Discrete(6)
+		self.action_space = spaces.Discrete(11)
 		# Example for using image as input (channel-first; channel-last also works):
 		self.observation_space = spaces.Box(low=0, high=255,
 											shape=(15,), dtype=np.float32)
@@ -111,6 +112,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		self.C_j      = np.max(self.C_ij, axis = 0)
 		filtered_Tard = np.sum(np.maximum(self.C_j[ConsideredJob] - self.d_j[ConsideredJob], 0))
 		self.all_Tard = np.sum(np.maximum(self.C_j - self.d_j, 0))
+
 		self.reward   = -(self.all_Tard*0.01 + filtered_Tard*0.99)/self.LB_Cmax
 		self.pre_JSet = copy.deepcopy(self.JSet)	
 
@@ -128,10 +130,10 @@ class FJSP_under_uncertainties_Env(gym.Env):
         , method.LAP_LFO
         , method.CDR1
         , method.CDR2
-        # , method.CDR3
+        , method.CDR3
         , method.CDR4
-        # , method.CDR5
-        # , method.CDR6
+        , method.CDR5
+        , method.CDR6
         # , method.RouteChange_RightShift
     	]
 	
