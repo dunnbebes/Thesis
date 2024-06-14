@@ -226,8 +226,6 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
             if LBest < GBest:
                 LB_id = np.argmin(fitness)
                 GBest      = LBest.copy()
-                print("check", LB_id)
-                print(population[LB_id])
                 G_OA       = population[LB_id][0].copy()
                 G_MS       = population[LB_id][1].copy()
                 no_improve = 0

@@ -422,7 +422,7 @@ class Method:
                 Reschedule_completion = True
             else:
                 self.T_cur = np.mean(self.S_k)
-                self.Tard_job = [j for j in dummy_JSet if self.d_j[j] < T_cur]
+                self.Tard_job = [j for j in dummy_JSet if self.d_j[j] < self.T_cur]
 
         # Calculate GBest
         GBest, C_j = evaluate_LocalCost(self.d_j, C_ij, self.JSet)
@@ -507,12 +507,10 @@ class Method:
                 workload[k] = np.sum(self.p_ijk[ope][job][k] * self.X_ijk[ope][job][k] for job in range(self.J) for ope in range(int(self.n_j[job] - self.n_ops_left_j[job])) )
             utilization = workload / self.T_cur
 
-            print(utilization[2:4])
             if r < 0.5:
                 k = np.argmin(utilization)
             else:
                 k = np.argmin(workload)   
-            print("k", k)        
             self.X_ijk[i][j][k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
             S_ij[i][j]          = max(self.S_j[j], self.S_k[k])

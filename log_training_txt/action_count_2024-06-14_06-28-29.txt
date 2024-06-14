@@ -1,0 +1,12 @@
+ Action  Count
+  exact   2153
+     GA   3562
+   LFOH   5633
+   LAPH   6168
+LAP_LFO   2794
+   CDR1   2791
+   CDR2   3076
+   CDR3   3857
+   CDR4   3577
+   CDR5   3699
+   CDR6   2690

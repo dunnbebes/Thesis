@@ -190,11 +190,11 @@ def random_events(t, K, X_ijk, S_ij, C_ij, JA_event, MB_event, events, maxtimeac
     #         events[next_MB_time].extend(formatted_elements)
 
     jobresemble = random.choice(list(range(J)))
-    events = {20: [("MB", 1)], 
-              50: [("MB", 3)], 
-              75: [("MB", 5)], 
-              90: [("JA", jobresemble)], 
-              110: [("MB", 4)]}
+    events = {50: [("MB", 1), ("MB", 13)], 
+              70: [("MB", 21)], 
+              100: [("MB", 8)], 
+              150: [("JA", jobresemble)], 
+              280: [("MB", 20)]}
     filtered_dict       = {key: value for key, value in events.items() if key > t}
     if filtered_dict:
         t               = min(filtered_dict)
