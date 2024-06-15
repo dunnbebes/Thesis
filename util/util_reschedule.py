@@ -190,7 +190,7 @@ def random_events(t, K, X_ijk, S_ij, C_ij, JA_event, MB_event, events, maxtimeac
     #         events[next_MB_time].extend(formatted_elements)
 
     jobresemble = random.choice(list(range(J)))
-    events = {50: [("MB", 1), ("MB", 13)], 
+    events = {20: [("MB", 1), ("MB", 13)], 
               70: [("MB", 21)], 
               100: [("MB", 8)], 
               150: [("JA", jobresemble)], 
