@@ -7,7 +7,7 @@ import copy
 import random
 from time                   import time
 from pulp                   import *
-from env_action.metaheu     import GeneticAlgorithm
+from env_action.metaheu     import GeneticAlgorithm, TabuSearch
 from util.util_action       import find_Mch_seq, evaluate_LocalCost, RightShift
 from scipy.optimize         import linear_sum_assignment
 
@@ -25,6 +25,7 @@ def action_space(J, I, K, p_ijk, h_ijk, d_j, n_j,
     return [
           method.exact
         , method.GA
+        , method.TS
         , method.LFOH
         , method.LAPH
         , method.LAP_LFO
@@ -146,6 +147,13 @@ class Method:
                                                     self.p_ijk, self.h_ijk, self.d_j, self.n_j, self.n_ops_left_j, 
                                                     self.MC_ji, self.n_MC_ji, self.OperationPool,
                                                     self.maxtime)
+        return GBest, X_ijk, S_ij, C_ij, C_j
+
+    def TS(self):
+        GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
+                                                    self.p_ijk, self.h_ijk, self.d_j, self.n_j, self.n_ops_left_j, 
+                                                    self.MC_ji, self.n_MC_ji, self.OperationPool, 
+                                                    self.X_ijk, self.S_ij, self.C_ij, self.t, self.maxtime)
         return GBest, X_ijk, S_ij, C_ij, C_j
 
 

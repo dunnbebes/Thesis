@@ -5,6 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import numpy as np
 import pandas as pd
 import random
+import copy
 import xlwings as xw
 import time
 from util.util_action import evaluate_LocalCost
@@ -258,9 +259,184 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
 
     return GBest, X_ijk, S_ij, C_ij, C_j
 
-def TabuSearch (J, I, K, JSet, OJSet, 
-                p_ijk, h_ijk, d_j, n_j, MC_ji, n_MC_ji,
-                X_ijk, S_ij, maxtime):
-    # Initialize solution
-    a = 1
+# ---------------------------------------------------------------------
+def get_cumulative_probability(k, operation, job, n_MC_ji, MC_ji):
+    print(job, operation, k)
+    print(MC_ji[job][operation])
+    # Identify the index of k in MC_ji
+    index_k = MC_ji[job][operation].index(k)
+    
+    # Determine the segment range
+    segment_size = 1 / n_MC_ji[job][operation]
+    lower_bound = index_k * segment_size
+    upper_bound = (index_k + 1) * segment_size
+    
+    # Generate a random number within the segment range
+    random_number = random.uniform(lower_bound, upper_bound)
+    
+    return random_number
+
+def generate_neighborhood(solution, neighborhood_size, chromosome_len):
+    current_OA = solution[0]
+    current_MS = solution[1]
+    neighborhood = set()
+    
+    while len(neighborhood) < neighborhood_size:
+        # Randomly choose two distinct positions for insertion
+        i, j        = random.sample(range(chromosome_len), 2)
+        neighbor_OA = copy.deepcopy(current_OA)
+        element_OA  = neighbor_OA.pop(i)
+        neighbor_OA.insert(j, element_OA)
+
+        i, j        = random.sample(range(chromosome_len), 2)
+        neighbor_MS = current_MS[:]
+        element_MS  = neighbor_MS.pop(i)
+        neighbor_MS.insert(j, element_MS)
+
+        neighbor = (neighbor_OA, neighbor_MS)
+
+        neighborhood.add(tuple(neighbor))
+        
+        # Randomly choose two adjacent positions for swapping
+        k = random.randint(0, chromosome_len - 2)
+        neighbor_OA = current_OA[:]
+        neighbor_OA[k], neighbor_OA[k + 1] = neighbor_OA[k + 1], neighbor_OA[k]
+
+        k = random.randint(0, chromosome_len - 2)
+        neighbor_MS = current_MS[:]
+        neighbor_MS[k], neighbor_MS[k + 1] = neighbor_MS[k + 1], neighbor_MS[k]
+
+        neighbor = (neighbor_OA, neighbor_MS)
+        neighborhood.add(tuple(neighbor))
+        
+        # Crossover
+        crossover_point = random.randint(1, chromosome_len - 1)
+        neighbor_OA = current_OA[crossover_point:] + current_OA[:crossover_point]
+
+        crossover_point = random.randint(1, chromosome_len - 1)
+        neighbor_MS = current_MS[crossover_point:] + current_MS[:crossover_point]
+
+        neighbor = (neighbor_OA, neighbor_MS)
+        neighborhood.add(tuple(neighbor))
+    
+    return [list(neighbor) for neighbor in neighborhood]
+
+
+def TabuSearch (S_k, S_j, JSet, J, I, K, 
+                p_ijk, h_ijk, d_j, n_j, n_ops_left_j, 
+                MC_ji, n_MC_ji, OperationPool, 
+                X_ijk, S_ij, C_ij, t, maxtime):
+    
+    max_Generation      = 500
+    max_No_improve      = 10
+    start_time          = time.time()
+    GBest               = float('inf')
+    tabu_list_size      = 10
+    neighborhood_size   = 5
+
+    """Initialize"""
+    # Take the machine for each operation
+    for j in range(J):
+        for i in range(n_j[j], I):
+
+    X_ij = np.argmax(X_ijk, axis=2)
+    print(S_ij)
+    # Flat
+    S_ij[S_ij == -999] = np.inf
+    S_ij_flat      = S_ij.flatten()
+    X_ij_flat      = X_ij.flatten()
+    print("flat \n", X_ij_flat)
+
+    ope            = np.repeat(np.arange(J), I)
+
+    # # Sort
+    sorted_indices = np.argsort(S_ij_flat)
+
+    sorted_S_ij    = S_ij_flat[sorted_indices]
+    sorted_X_ij    = X_ij_flat[sorted_indices]
+    sorted_ope     = ope [sorted_indices]
+
+    running_mask   = sorted_S_ij < t
+    sorted_S_ij    = sorted_S_ij[running_mask]
+    sorted_X_ij    = sorted_X_ij[running_mask]
+    print("sorted \n", sorted_X_ij)
+    OA             = sorted_ope [running_mask]
+
+    chromosome_len = len(OA)
+    MS             = np.zeros((chromosome_len))
+
+    counts         = {}
+
+    for gene in range(chromosome_len):
+        job = OA[gene]
+        if job not in counts:
+            counts[job] = -1 + n_j[job]
+        counts[job] += 1
+        operation = type(job)(counts[job])
+        k         = sorted_X_ij[gene]
+        MS[gene]  = get_cumulative_probability(k, operation, job, n_MC_ji, MC_ji)
+
+    # if JA:
+    #     for new_job in JA:
+    #         chromosome_len += n_j[newjob]
+    #         if urgent:
+                
+    #         else:
+                
+
+    current_solution               = (OA, MS)
+    GSol                           = copy.deepcopy(current_solution)
+    GBest, X_ijk, S_ij, C_ij, C_j  = decoding(S_k, S_j, GSol[0], GSol[1], chromosome_len, 
+                                   n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
+
+    # tabu_list    = []
+    # generation   = 0
+    # no_improve   = 0
+    # elapsed_time = 0
+    # while generation < max_Generation and no_improve < max_No_improve and elapsed_time < maxtime:
+    #     # Generate the neighborhood of the current solution
+    #     neighborhood = generate_neighborhood(current_solution, neighborhood_size, chromosome_len)
+        
+    #     # Find the best non-tabu solution in the neighborhood
+    #     best_neighbor = None
+    #     best_neighbor_objective = float('inf')
+    #     for neighbor in neighborhood:
+    #         if neighbor not in tabu_list:
+    #             neighbor_objective, X, S, C, Cj = decoding(S_k, S_j, neighbor[0], neighbor[1], chromosome_len, 
+    #                                                        n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
+    #             if neighbor_objective < best_neighbor_objective:
+    #                 best_neighbor               = copy.deepcopy(neighbor)
+    #                 best_neighbor_objective     = copy.deepcopy(neighbor_objective)
+        
+    #     # Update the current solution and the best solution
+    #     current_solution = best_neighbor
+    #     if best_neighbor_objective < GBest:
+    #         GSol  = copy.deepcopy(best_neighbor)
+    #         GBest = copy.deepcopy(best_neighbor_objective)
+    #         no_improve = 0
+    #     else:
+    #         no_improve += 1
+        
+    #     # Add the current solution to the tabu list
+    #     tabu_list.append(current_solution)
+    #     if len(tabu_list) > tabu_list_size:
+    #         tabu_list.pop(0)
+
+    #     generation += 1
+    #     elapsed_time = time.time() - start_time
+        
+
+    # GBest, X_ijk, S_ij, C_ij, C_j = decoding(S_k, S_j, GSol[0], GSol[1], chromosome_len, 
+    #                                          n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
+
+    return GBest, X_ijk, S_ij, C_ij, C_j
+
+J = 3
+I = 5
+n_j = np.fill(J, 3)
+
+for j in range(J):
+    for i in range(n_j[j], I):
+        print(j, i)
+
     
