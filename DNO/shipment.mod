@@ -55,14 +55,15 @@ subject to Flow_Balance {fac in FacilityID, product in ProductID}:
                                                             = sum{shipto in ShipToID}    Shipments[fac, shipto, product] 
                                                             + TransferOut[fac, product] 
                                                             + EndingInventory[fac, product];
-# subject to Flow_Transfer_In  {fac in FacilityID, product in ProductID}:
-#     TransferIn[fac, product]  = sum{(OriginFac, fac) in TransferFlows} Transfers[OriginFac, fac];
-# subject to Flow_Transfer_Out {fac in FacilityID, product in ProductID}:
-#     TransferOut[fac, product] = sum{(fac, DestinationFac) in TransferFlows} Transfers[fac, DestinationFac];
+                                                            
 subject to Flow_Transfer_In  {fac in FacilityID, product in ProductID}:
-    TransferIn[fac, product]  = sum{OriginFac in FacilityID} Transfers[OriginFac, fac, product];
+    TransferIn[fac, product]  = sum{(OriginFac, fac) in TransferFlows} Transfers[OriginFac, fac, product];
 subject to Flow_Transfer_Out {fac in FacilityID, product in ProductID}:
-    TransferOut[fac, product] = sum{DestinationFac in FacilityID} Transfers[fac, DestinationFac, product];
+    TransferOut[fac, product] = sum{(fac, DestinationFac) in TransferFlows} Transfers[fac, DestinationFac, product];
+# subject to Flow_Transfer_In  {fac in FacilityID, product in ProductID}:
+#     TransferIn[fac, product]  = sum{OriginFac in FacilityID} Transfers[OriginFac, fac, product];
+# subject to Flow_Transfer_Out {fac in FacilityID, product in ProductID}:
+#     TransferOut[fac, product] = sum{DestinationFac in FacilityID} Transfers[fac, DestinationFac, product];
 
 ## Facility Capacity
 # subject to Facility_Capacity_inKG {fac in FacilityID}:

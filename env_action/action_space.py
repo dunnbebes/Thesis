@@ -27,6 +27,10 @@ def action_space(J, I, K, p_ijk, h_ijk, d_j, n_j,
         , method.LFOH
         , method.LAPH
         , method.LAP_LFO
+        , method.LFOH_TS
+        , method.LAPH_TS
+        , method.LFOH_GA
+        , method.LAPH_GA
         , method.CDR1
         , method.CDR2
         , method.CDR3
@@ -432,7 +436,6 @@ class Method:
         OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, 
                                                         X_ijk, S_ij, self.MC_ji, self.n_MC_ji, self.n_ops_left_j,
                                                         self.t)
-        
         current_solution              = (OA, MS)
         population                    = generate_neighborhood(current_solution, self.PopSize, chromosome_len)
         GBest, X_ijk, S_ij, C_ij, C_j = GeneticAlgorithm(self.S_k, self.S_j, self.JSet, self.OJSet, 
@@ -441,12 +444,22 @@ class Method:
                                                     self.MC_ji, self.n_MC_ji, self.OperationPool,
                                                     self.PopSize, population, chromosome_len,
                                                     StartTime, self.maxtime)
-
         return GBest, X_ijk, S_ij, C_ij, C_j
     
     def LAPH_GA(self):
         StartTime = time()
-
+        GBest, X_ijk, S_ij, C_ij, C_j = self.LAPH()
+        OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, 
+                                                        X_ijk, S_ij, self.MC_ji, self.n_MC_ji, self.n_ops_left_j,
+                                                        self.t)
+        current_solution              = (OA, MS)
+        population                    = generate_neighborhood(current_solution, self.PopSize, chromosome_len)
+        GBest, X_ijk, S_ij, C_ij, C_j = GeneticAlgorithm(self.S_k, self.S_j, self.JSet, self.OJSet, 
+                                                    self.J, self.I, self.K, 
+                                                    self.p_ijk, self.h_ijk, self.d_j, self.n_j, self.n_ops_left_j, 
+                                                    self.MC_ji, self.n_MC_ji, self.OperationPool,
+                                                    self.PopSize, population, chromosome_len,
+                                                    StartTime, self.maxtime)
         return GBest, X_ijk, S_ij, C_ij, C_j
     
     def CDR1(self):
