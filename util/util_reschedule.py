@@ -8,29 +8,6 @@ def find_indices(X, k):
     indices = np.argwhere(X[:, :, k] == 1)
     return [(idx[0], idx[1]) for idx in indices]
 
-def find_avgload(J, K, h_ijk, p_ijk, n_j):
-    avgload_k   = np.zeros((K)) # average load
-    denominator = np.zeros((J))
-    part        = np.zeros((J))
-
-    for k in range(K):
-        for j in range(J):
-            denominator [j]   = sum(h_ijk[i][j][k] for i in range(int(n_j[j])))
-            if denominator[j] == 0:
-                part[j] = 0
-            else:
-                part[j] = sum(h_ijk[i][j][k] * p_ijk[i][j][k] for i in range(int(n_j[j])))/ sum(h_ijk[i][j][k] for i in range(int(n_j[j])))
-
-        avgload_k [k] = sum(part[j] for j in range(J))
-        
-    return avgload_k
-
-
-def find_P(J, K, h_ijk, p_ijk, n_j):
-    P = sum(sum(sum(h_ijk[i][j][k]*p_ijk[i][j][k] for k in range(K))/sum(h_ijk[i][j][k] for k in range(K)) for i in range(int(n_j[j])))/int(n_j[j]) for j in range(J)) / J
-    
-    return P
-
 def find_S_j (t, JSet, ODSet, C_ij, J):
     S_j = np.zeros(J)
     # Create a boolean mask for jobs with empty ODSet
@@ -47,12 +24,6 @@ def find_S_j (t, JSet, ODSet, C_ij, J):
     S_j[np.array(JSet)[empty_mask]] = t
 
     return S_j
-
-def generate_nonzero_exponential(scale):
-    value = 0
-    while value == 0:
-        value = round(np.random.exponential(scale=scale))
-    return value
 
 
 def change_dataset(p_ijk, h_ijk, X_ijk, S_ij, C_ij, MC_ji, n_MC_ji, n_j, j, i, processed, I, K, org_p_ijk, org_h_ijk):
@@ -141,30 +112,98 @@ def change_dataset(p_ijk, h_ijk, X_ijk, S_ij, C_ij, MC_ji, n_MC_ji, n_j, j, i, p
     
     return p_ijk, h_ijk, X_ijk, S_ij, C_ij, MC_ji, n_MC_ji, n_j, I, org_p_ijk, org_h_ijk
 
+def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record):
+    events          = {}
+    have_event      = False
+    for job, deadline, description in JA_event:
+        have_event  = True
+        time_occur  = C_j[job]
+        if time_occur not in events:
+            events[time_occur] = []
+        events[time_occur].append(("JA", job, deadline, description))
 
-def random_events(t, K, X_ijk, S_ij, C_ij, JA_event, MB_event, events, maxtimeacceptnewjob, J, defectProb):
-
-    events = {20: [("MB", 1), ("MB", 13)], 
-              70: [("MB", 21)], 
-              100: [("MB", 8)], 
-              150: [("JA", jobresemble)], 
-              280: [("MB", 20)]}
+    for k in range(K):
+        if MB_event[k]:
+            have_event  = True
+            time_occur, repair, description = MB_event[k][0]
+            if time_occur not in events:
+                events[time_occur] = []
+            events[time_occur].append(("MB", k, repair, description))
     
-    filtered_dict       = {key: value for key, value in events.items() if key > t}
-    if filtered_dict:
-        t               = min(filtered_dict)
-        triggered_event = filtered_dict[t].copy()
-    else: 
-        t               = np.max(C_ij)
-        triggered_event = None
-       
+    re            = np.zeros((K)) 
+    if have_event == True:
+        found         = None
+        while found == None:
+            affected_Oij    = {}
+            new_time        = copy.deepcopy(int(min(events.keys())))
+            triggered_event = events[new_time]
+            need_modify     = 0
+            for uncertain_type, k, time_event, description in triggered_event:
+                if uncertain_type == "MB":
+                    X_mask =  X_ijk.astype(bool)
+                    re[k]  =  time_event
+                    """Find affected operation"""
+                    # Use the boolean mask to find the indices where overlap occurs
+                    overlap_mask = np.logical_or(
+                        np.logical_and(S_ij >= new_time        , C_ij <= new_time + re[k]),       # in
+                        np.logical_and(S_ij <= new_time        , C_ij >  new_time        ),       # left
+                        np.logical_and(S_ij <  new_time + re[k], C_ij >= new_time + re[k]))       # right
+                    indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :])
+                    # Append the indices to the affected_Oij dictionary
+                    if len(indices) > 0:
+                        adjusted_indices = [[i+ 1, j] for i, j in indices] # Due to segmentize the operation
+                        affected_Oij[k] = adjusted_indices
+                    if k not in affected_Oij:
+                        event = (uncertain_type, k, time_event, description)
+                        # Remove current time
+                        events[new_time].remove(event)
+                        if not events[new_time]:
+                            events.pop(new_time)
+                        # Adjust to new time (shift_time)
+                        mask          = np.logical_and(S_ij > new_time, X_ijk[:, :, k] == 1)
+                        filtered_S_ij = S_ij[mask]
+                        if filtered_S_ij.size > 0:
+                            shift_time    = np.min(filtered_S_ij)
+                            if shift_time not in events:
+                                events[shift_time] = []
+                            events[shift_time].append(event)
+                            # Adjust var
+                            need_modify += 1
+                        else:
+                            MB_event[k].pop(0)
+            if need_modify == 0:
+                found = True
 
-    return JA_event, MB_event, events, t, triggered_event
+        for uncertain_type, partID, time_event, description in triggered_event:
+            if uncertain_type == "JA":
+                JA_event = [JA for JA in JA_event if JA[0] != partID]
+            else:
+                if partID not in MB_record:
+                    MB_record[partID] = []
+                record = (new_time, new_time+re[partID])
+                MB_record[partID].append(record)
+                MB_event[partID].pop(0)
+        for key, value in events.items():
+            if key < new_time:
+                new_key = new_time + 60
+                if new_key in new_data:
+                    events[new_key].extend(value)
+                else:
+                    events[new_key] = value
+        if not triggered_event:
+            new_time = np.max(C_j)
+            triggered_event = None     
+    else:
+        new_time = np.max(C_j)
+        triggered_event = None  
+        affected_Oij = {}   
+
+    return JA_event, MB_event, new_time, triggered_event, affected_Oij, re, MB_record
 
     
 def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
              d_j, n_j, p_ijk, h_ijk, J, I, K, X_ijk, S_ij, C_ij, \
-             OperationPool, MB_info, MB_record, S_k,             \
+             OperationPool, re, S_k,                             \
              org_J, org_p_ijk, org_h_ijk, org_n_j,               \
              org_MC_ji, org_n_MC_ji, C_j                         ):
     
@@ -184,18 +223,21 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
         ODSet[j] = np.where(S_ij[:int(n_j[j]), j] < t)[0].tolist()
 
     #------------------------------------------------------------------------
-    JA                 = []
-    MB                 = []
-    Oij_on_machine     = [[] for _ in range(K)]
-    affected_Oij       = {}
-    re                 = np.zeros((K))          # repair time
-
-    S_j = np.zeros((J))
+    JA                  = []
+    MB                  = [[] for _ in range(K)]
+    Oij_on_machine      = [[] for _ in range(K)]
+    JA_urgent_boolean   = 0
+    JA_long_boolean     = 0
+    MB_critical_boolean = 0
+    NewJobList          = []
     if triggered_event is not None:
-        for type, detailed in triggered_event:
-            if type == "MB": MB.append(detailed)    # if Machine break down
-            else:            JA.append(detailed)    # if Job arrival
-                
+        for uncertain_type, partID, time_event, description in triggered_event:
+            if uncertain_type == "MB": 
+                MB[partID].append((time_event, description))    # if Machine break down
+                if description == "critical": MB_critical_boolean = 1
+            else:            
+                JA.append((partID, time_event, description))   # if Job arrival
+
         # Operation on machine ------------------------------------------------
         for k in range(K):
             i, j = np.where((X_ijk[:, :, k] == 1) & (S_ij < t) & (C_ij > t))
@@ -203,34 +245,13 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                 operation = (i,j)
                 Oij_on_machine[k].append(operation)
 
-        # Check if MB -----------------------------------------------------------
-        if MB:
-            X_mask =  X_ijk.astype(bool)
-            for k in MB:
-                re[k] = random.randint(5, 60)
-                """Add in MB_record"""
-                if k not in MB_record:
-                    MB_record[k] = []
-                record = (t, t+re[k])
-                MB_record[k].append(record)
-                """Find affected operation"""
-                # Use the boolean mask to find the indices where overlap occurs
-                overlap_mask = np.logical_or(
-                    np.logical_and(S_ij >= t        , C_ij <= t + re[k]),       # in
-                    np.logical_and(S_ij <= t        , C_ij >  t        ),       # left
-                    np.logical_and(S_ij <  t + re[k], C_ij >= t + re[k]))       # right
-                indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :])
-                # Append the indices to the affected_Oij dictionary
-                if len(indices) > 0:
-                    affected_Oij[k] = indices.tolist()
-
         # Soonest start time ------------------------------------------------------
-        id       = np.zeros((K)) # boolean, =1 if machine idle at time t, 0 otherwise (busy processing or repair)
+        idle     = np.zeros((K)) # boolean, =1 if machine idle at time t, 0 otherwise (busy processing or repair)
         bu       = np.zeros((K)) # boolean, =1 if machine busy processing, = 0 if machine is repaired
         av       = np.zeros((K)) # remaining processing time 
 
         for k in range(K):
-            if k not in MB:
+            if not MB[k]:
                 operation = Oij_on_machine[k]
                 if len(operation) != 0:
                     i = copy.deepcopy(operation[0][0][0])
@@ -238,7 +259,7 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                     av[k] = C_ij[i][j] - t
                     bu[k] = 1
                 else:   
-                    id[k] = 1
+                    idle[k] = 1
             else:
                 operation = Oij_on_machine[k]
                 if len(operation) != 0:
@@ -256,13 +277,14 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                     if j not in DSet:
                         DSet.append(j)
 
-        S_k = np.maximum(t + (1-id)*(bu*av + (1-bu)*re), S_k)
+        S_k = np.maximum(t + (1-idle)*(bu*av + (1-bu)*re), S_k)
         
         # Check if JA -----------------------------------------------------------
         if JA: 
-            for jobresemble in JA: 
+            for jobresemble, deadline, description in JA: 
                 """Adjust the dataset"""              
                 J += 1
+                NewJobList.append((J-1, description))
                 # num operation of new job
                 n_newjob                   = copy.deepcopy(org_n_j[jobresemble])
                 n_j                        = np.append(n_j, n_newjob)
@@ -270,8 +292,15 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                 p_newjob                   = copy.deepcopy(org_p_ijk[:, jobresemble, :])
                 p_newjob_reshape           = copy.deepcopy(p_newjob[:, np.newaxis, :])
                 p_ijk                      = np.concatenate((p_ijk, p_newjob_reshape), axis= 1)
+                TPT                        = np.sum(np.mean(p_newjob, axis= 1))
+                if TPT > 1000:
+                    JA_long_boolean = 1
                 # deadline
-                d_newjob                   = t + np.round(np.sum(np.mean(p_newjob, axis=1))*np.random.uniform(1, 5))
+                if description == "urgent":
+                    d_newjob = TPT*deadline
+                    JA_urgent_boolean = 1
+                else:
+                    d_newjob = deadline
                 d_j                        = np.append(d_j, d_newjob)
                 # capable machine            
                 h_newjob                   = copy.deepcopy(org_h_ijk[:, jobresemble, :])
@@ -328,7 +357,7 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                         k_min_index = np.argmin(sums)
                         k           = copy.deepcopy(Considered_list[k_min_index])
                         if Oij_on_machine[k]:
-                            operation  = copy.deepcopy(Oij_on_machine[k]) ###################
+                            operation  = copy.deepcopy(Oij_on_machine[k]) 
                             i, j       = copy.deepcopy(operation)
                             processed  = t - S_ij[i][j]
 
@@ -341,53 +370,24 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                                 JSet.append(j)
                             if j not in DSet:
                                 DSet.append(j)
-
+    
+    S_j = np.zeros((J))
+    if triggered_event is not None:
         for j in JSet:
             if len(ODSet[j]) == 0:
                 S_j[j] = t
             else: 
                 last_operation = ODSet[j][-1]
                 S_j[j] = max(C_ij[last_operation][j], t)
-    
+
     # Number of operation of job j that have been run ---------------------------------
     n_ops_left_j = np.array([len(sublist) for sublist in OJSet])
     OperationPool['Num operation left'] = n_ops_left_j.astype(int)
 
     # Observation --------------------------------------------------------------------    
-    # Update remaining repair time
-    
-    if MB_info.shape != (0,) and MB_info.shape!= (3,):
-        MB_info[1]         = t - MB_info[2]
-        notDoneRepair_mask = MB_info[1, :] > 0
-        MB_info            = MB_info[:, notDoneRepair_mask]
-    else:
-        if MB_info.shape == (3,):
-            MB_info[1] = t - MB_info[2]
-            MB_info = np.zeros((0)) if MB_info[1] <= 0 else MB_info
-
-    # Add new breakdown machine
-    if MB:
-        k = copy.deepcopy(MB[0])
-        new_column = np.array([k, re[k], S_k[k]])
-        MB_info = new_column if MB_info.shape == (0,) and MB_info.shape != (3,) else np.column_stack((MB_info, new_column))
- 
-        for k in MB[1:]:
-            new_column = np.array([k, re[k], S_k[k]])
-            MB_info = np.column_stack((MB_info, new_column))
-    remaining_re = np.mean(MB_info[1]) if MB_info.shape != (0,) else 0
-
-    percent_JA = len(JA)/org_J 
-    if MB_info.shape == (0,) :
-        percent_MB = 0 
-    elif MB_info.shape == (3,):
-        percent_MB = 1/K
-    else:
-        percent_MB = MB_info.shape[1]/K
-
-    JA = 1 if JA else 0
-    MB = 1 if MB else 0
-
-    #------------------------------------------------------
+    JA_boolean = 1 if JA else 0
+    MB_boolean = 1 if any(breakdown for breakdown in MB) else 0
+    sum_re     = np.sum(re)
     # Find completion time of last operation assigned to machine k at rescheduling point t
     CT_k = np.zeros(K)
     for k in range(K):  
@@ -397,17 +397,16 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
             i, j      = indices[max_index]
             CT_k[k]   = C_ij[i, j] 
 
-    # The average completion time of the last operation already run on each machine at current decision point t
-    T_cur = np.mean(S_k)
-    
-    # Tard_job
+    T_cur    = np.mean(S_k)
     Tard_job = [j for j in JSet if d_j[j] < T_cur]
 
-    return  S_k, S_j, J, I, JSet, OJSet, DSet, ODSet, OperationPool,             \
-            n_ops_left_j, MC_ji, n_MC_ji, d_j, n_j, p_ijk, h_ijk,                \
-            org_p_ijk, org_h_ijk, org_n_j, org_MC_ji, org_n_MC_ji,               \
-            Oij_on_machine, affected_Oij, MB_info, MB_record, X_ijk, S_ij, C_ij, \
-            JA, percent_JA, MB, percent_MB, remaining_re, CT_k, T_cur, Tard_job, C_j
+    return  S_k, S_j, J, I, JSet, OJSet, DSet, ODSet, OperationPool, \
+            n_ops_left_j, MC_ji, n_MC_ji, d_j, n_j, p_ijk, h_ijk,    \
+            org_p_ijk, org_h_ijk, org_n_j, org_MC_ji, org_n_MC_ji,   \
+            Oij_on_machine, X_ijk, S_ij, C_ij, C_j,                  \
+            JA_boolean, JA_long_boolean, JA_urgent_boolean,          \
+            MB_boolean, MB_critical_boolean, sum_re,                 \
+            CT_k, T_cur, Tard_job, NewJobList
 
 
 def store_schedule(X_ijk, S_ij, C_ij):
@@ -420,7 +419,56 @@ def store_schedule(X_ijk, S_ij, C_ij):
 def update_schedule(DSet, ODSet, X_ijk, S_ij, C_ij, X_previous, S_previous, C_previous):
     for j in DSet:
         for i in ODSet[j]:
-            X_ijk[i][j] = copy.deepcopy(X_previous[i][j])
-            S_ij [i][j] = copy.deepcopy(S_previous[i][j])
-            C_ij [i][j] = copy.deepcopy(C_previous[i][j])
+            X_ijk[i, j] = copy.deepcopy(X_previous[i, j])
+            S_ij [i, j] = copy.deepcopy(S_previous[i, j])
+            C_ij [i, j] = copy.deepcopy(C_previous[i, j])
     return X_ijk, S_ij, C_ij
+
+def generate_random_event (J, K, planning_horizon, WeibullDistribution, critical_machines, ReworkProbability):
+    JA_event = []
+    MB_event = [[] for _ in range(K)]
+    # Determine description based on scenario
+    description = random.choice(['urgent', 'normal', 'loose'])
+
+    # Set deadline based on description
+    if description == 'urgent':
+        Deadline = np.random.randint(1, 11, size=J)
+    elif description == 'normal':
+        Deadline = np.full(J, planning_horizon)
+    elif description == 'loose':
+        Deadline = np.full(J, 2 * planning_horizon)
+
+    # Generate defected jobs with 3% probability
+    defected_jobs_indices = np.where(np.random.uniform(size=J) < ReworkProbability)[0]  # One-indexed
+    for job_id in defected_jobs_indices:
+        JA_event.append((job_id, Deadline[job_id], description)) # Adjusting for one-indexing
+
+    # Iterate over each row in the DataFrame
+    for _, row in WeibullDistribution.iterrows():
+        machine_id                       = row['MachineID']
+        shape_up, loc_up, scale_up       = ast.literal_eval(row['ParameterUpTime'])
+        shape_down, loc_down, scale_down = ast.literal_eval(row['ParameterDownTime'])
+        description                      = "critical" if machine_id in critical_machines else "normal"
+        # Calculate uptime and downtime
+        t = -604800*2
+        downtime = 0
+        while t < planning_horizon:
+            skip     = False
+            t       += downtime
+            uptime   = math.ceil(weibull_min.rvs(c=shape_up, loc=0, scale=scale_up))*60 # change to second
+            count    = 0
+            while uptime < 600:
+                uptime   = math.ceil(weibull_min.rvs(c=shape_up, loc=0, scale=scale_up))*60 # change to second
+                count += 1
+                if count == 10:
+                    skip = True
+                    break
+            downtime = math.ceil(weibull_min.rvs(c=shape_down, loc=0, scale=scale_down))*60 # change to second
+            t += uptime
+            if skip == True:
+                break
+            else:
+                if t > 0 and t < planning_horizon:
+                    MB_event[machine_id - 1].append((t, downtime, description))
+    
+    return JA_event, MB_event

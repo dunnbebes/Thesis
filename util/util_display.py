@@ -15,9 +15,9 @@ def plot(J, K, n_j, X_ijk, S_ij, C_ij, MB_record, t):
     machines_with_jobs = set()
 
     # Generate a colormap with a sufficient number of colors
-    cmap = plt.get_cmap('tab20c', J + 1)
-    colors = [mcolors.rgb2hex(cmap(i)) for i in np.linspace(0, 1, J + 1)]
-    
+    cmap = plt.get_cmap('tab20c', J + 1)    
+    colors = [mcolors.rgb2hex(cmap(i)) for i in np.linspace(0, 1, J+1)]
+
     # Create a color dictionary mapping resources to their colors
     color_dict = {f'Job {j}': colors[j % len(colors)] for j in range(J)}
     color_dict['No Job'] = '#e6ecf5'
@@ -31,14 +31,14 @@ def plot(J, K, n_j, X_ijk, S_ij, C_ij, MB_record, t):
                     start_time = start_date + datetime.timedelta(seconds=S_ij[i][j])
                     completion_time = start_date + datetime.timedelta(seconds=C_ij[i][j])
                     
-                    gantt_data.append(dict(Task=f'Machine {k}', Start=start_time, Finish=completion_time,
+                    gantt_data.append(dict(Task=f'Machine {k+1}', Start=start_time, Finish=completion_time,
                                            Resource=f'Job {j}'))
                     machines_with_jobs.add(k)
 
         if k not in machines_with_jobs:
             dummy_start_time = start_date
-            dummy_end_time = start_date + datetime.timedelta(seconds=1)  # Minimal duration to display the task
-            gantt_data.append(dict(Task=f'Machine {k}', Start=dummy_start_time, Finish=dummy_end_time,
+            dummy_end_time = start_date + datetime.timedelta(seconds=600) 
+            gantt_data.append(dict(Task=f'Machine {k+1}', Start=dummy_start_time, Finish=dummy_end_time,
                                    Resource='No Job'))
         
 
@@ -59,7 +59,7 @@ def plot(J, K, n_j, X_ijk, S_ij, C_ij, MB_record, t):
                 t1_datetime = start_date + datetime.timedelta(seconds=MB_starttime)
                 t2_datetime = start_date + datetime.timedelta(seconds=MB_endtime)
                 # Add rectangle for the machine breakdown
-                gantt_data.append(dict(Task=f'Machine {k}', Start=t1_datetime, Finish=t2_datetime,
+                gantt_data.append(dict(Task=f'Machine {k+1}', Start=t1_datetime, Finish=t2_datetime,
                                     Resource=f'Machine Breakdown', Color='white'))
                 # Add "X" spanning the rectangle as annotation
                 fig.add_shape(

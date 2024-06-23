@@ -1,0 +1,5 @@
+Defected Jobs
+JobID, Deadline_info, Description
+
+MachineBreakdown
+MachineID, BD_time, 	Re_time

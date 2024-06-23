@@ -56,7 +56,7 @@ def decoding(S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_
     
     # X_ij
     for i, j, k in Sol:
-        X_ijk[i][j][k] = 1
+        X_ijk[i, j, k] = 1
     
     # S_ij and C_ij
     job_seq     = [[] for _ in range(J)]
@@ -64,26 +64,26 @@ def decoding(S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_
 
     for i, j, k in Sol:
         if len(job_seq[j]) == 0 and len(machine_seq[k]) == 0:
-            S_ij[i][j] = max(S_k[k], S_j[j])
+            S_ij[i, j] = max(S_k[k], S_j[j])
         else: 
             if len(job_seq[j]) == 0: 
-                pre_ope_in_job = S_j[j]
+                pre_ope_in_job = copy.deepcopy(S_j[j])
             else: 
                 [a,b] = job_seq[j][-1]
-                pre_ope_in_job = C_ij[a][b]
+                pre_ope_in_job = C_ij[a, b]
             if len(machine_seq[k]) == 0: 
-                pre_ope_in_machine = S_k[k]
+                pre_ope_in_machine =copy.deepcopy(S_k[k])
             else:
-                [c,d] = machine_seq      [k][-1]
-                pre_ope_in_machine = C_ij[c][d]
+                [c,d] = machine_seq[k][-1]
+                pre_ope_in_machine = copy.deepcopy(C_ij[c, d])
             
-            S_ij[i][j] = max(pre_ope_in_job, pre_ope_in_machine)
+            S_ij[i, j] = max(pre_ope_in_job, pre_ope_in_machine)
 
         scheduled_Oij = [i, j] 
         job_seq     [j].append(scheduled_Oij)
         machine_seq [k].append(scheduled_Oij)    
         
-        C_ij[i][j] = S_ij[i][j] + X_ijk[i][j][k] * p_ijk[i][j][k]
+        C_ij[i, j] = S_ij[i, j] + p_ijk[i, j, k]
 
     sum_tardiness, C_j = evaluate_LocalCost(d_j, C_ij, JSet)
 
@@ -126,6 +126,7 @@ def crossover(population, parent_indices, child_indices, crossover_rate, chromos
         chosen_parents_indices    = random.sample(parent_indices, 2)
         parent1                   = population[chosen_parents_indices[0]]
         parent2                   = population[chosen_parents_indices[1]]
+
         if random.random() <= crossover_rate:
             offspring1 = parent1[0].copy(), parent1[1].copy()
             offspring2 = parent2[0].copy(), parent2[1].copy()
@@ -136,7 +137,6 @@ def crossover(population, parent_indices, child_indices, crossover_rate, chromos
             for chromosome in range(2):
                 offspring1[chromosome][:point] = parent1[chromosome][:point].copy()
                 offspring1[chromosome][point:] = parent2[chromosome][point:].copy()
-                
                 offspring2[chromosome][:point] = parent2[chromosome][:point].copy()
                 offspring2[chromosome][point:] = parent1[chromosome][point:].copy()
 
@@ -313,11 +313,12 @@ def generate_neighborhood(solution, neighborhood_size, chromosome_len):
         neighbor = (tuple(neighbor_OA), tuple(neighbor_MS))
         neighborhood.add(neighbor)
     
-    return [list(neighbor) for neighbor in neighborhood]
+    return [(list(OA), list(MS)) for OA, MS in neighborhood]
 
 
 def encode_schedule(J, I, n_j, X_ijk, S_ij, 
                     MC_ji, n_MC_ji, n_ops_left_j, t):
+    
     for j in range(J):
         S_ij[n_j[j]:, j] = np.inf
     X_ij           = np.argmax(X_ijk, axis=2)
@@ -347,8 +348,7 @@ def encode_schedule(J, I, n_j, X_ijk, S_ij,
 
 def TabuSearch (S_k, S_j, JSet, J, I, K, 
                 p_ijk, d_j, n_j, n_ops_left_j, 
-                MC_ji, n_MC_ji, X_ijk, S_ij, C_ij,
-                OA, MS, chromosome_len, StartTime, maxtime):
+                MC_ji, n_MC_ji, OA, MS, chromosome_len, StartTime, maxtime):
 
     max_Generation                 = 500
     max_No_improve                 = 10
@@ -357,8 +357,7 @@ def TabuSearch (S_k, S_j, JSet, J, I, K,
     neighborhood_size              = 5
     current_solution               = (OA, MS)
     GSol                           = copy.deepcopy(current_solution)
-    GBest, X_ijk, S_ij, C_ij, C_j  = decoding(S_k, S_j, GSol[0], GSol[1], chromosome_len, 
-                                             n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
+  
     tabu_list    = []
     generation   = 0
     no_improve   = 0

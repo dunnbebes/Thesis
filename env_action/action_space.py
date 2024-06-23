@@ -15,11 +15,13 @@ from scipy.optimize         import linear_sum_assignment
 def action_space(J, I, K, p_ijk, h_ijk, d_j, n_j, 
                  MC_ji, n_MC_ji, n_ops_left_j, OperationPool, S_k, S_j, 
                  JSet, OJSet, Oij_on_machine, affected_Oij, 
-                 t, X_ijk, S_ij, C_ij, C_j, CT_k, T_cur, Tard_job, NewJobList, maxtime):
+                 t, X_ijk, S_ij, C_ij, C_j, CT_k, T_cur, Tard_job,
+                 NewJobList, PopSize, maxtime):
     method = Method(J, I, K, p_ijk, h_ijk, d_j, n_j, 
                     MC_ji, n_MC_ji, n_ops_left_j, OperationPool, S_k, S_j, 
                     JSet, OJSet, Oij_on_machine, affected_Oij, 
-                    t, X_ijk, S_ij, C_ij, C_j, CT_k, T_cur, Tard_job, NewJobList, maxtime)
+                    t, X_ijk, S_ij, C_ij, C_j, CT_k, T_cur, Tard_job,
+                    NewJobList, PopSize, maxtime)
     return [
           method.exact
         , method.GA
@@ -37,7 +39,7 @@ def action_space(J, I, K, p_ijk, h_ijk, d_j, n_j,
         , method.CDR4
         , method.CDR5
         , method.CDR6
-        # , method.RouteChange_RightShift
+        , method.RouteChange_RightShift
     ]
 
 
@@ -149,17 +151,18 @@ class Method:
         StartTime                     = time()
         population, chromosome_len    = random_population(self.OperationPool, self.PopSize)
         GBest, X_ijk, S_ij, C_ij, C_j = GeneticAlgorithm(self.S_k, self.S_j, self.JSet, self.OJSet, 
-                                                    self.J, self.I, self.K, 
-                                                    self.p_ijk, self.h_ijk, self.d_j, self.n_j, self.n_ops_left_j, 
-                                                    self.MC_ji, self.n_MC_ji, self.OperationPool,
-                                                    self.PopSize, population, chromosome_len,
-                                                    StartTime, self.maxtime)
+                                                        self.J, self.I, self.K, 
+                                                        self.p_ijk, self.h_ijk, self.d_j, self.n_j, self.n_ops_left_j, 
+                                                        self.MC_ji, self.n_MC_ji, self.OperationPool,
+                                                        self.PopSize, population, chromosome_len,
+                                                        StartTime, self.maxtime)
         return GBest, X_ijk, S_ij, C_ij, C_j
 
     def TS(self):
         StartTime              = time()
-        OA, MS, chromosome_len = encode_schedule(self.J, self.I, self.K, self.n_j, X_ijk, S_ij, 
-                                                 self.MC_ji, self.n_MC_ji, self.t)
+        OA, MS, chromosome_len = encode_schedule(self.J, self.I, self.n_j, self.X_ijk, self.S_ij, 
+                                                self.MC_ji, self.n_MC_ji, self.n_ops_left_j, self.t)
+        
         if self.NewJobList:
             for job, deadline in self.NewJobList:
                 chromosome_len += self.n_j[job]
@@ -172,8 +175,7 @@ class Method:
                     MS = MS + random_numbers
         
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
-                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, 
-                                                    self.MC_ji, self.n_MC_ji, self.X_ijk, self.S_ij, self.C_ij, 
+                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, self.MC_ji, self.n_MC_ji, 
                                                     OA, MS, chromosome_len, StartTime, self.maxtime)
         return GBest, X_ijk, S_ij, C_ij, C_j
 
@@ -185,19 +187,20 @@ class Method:
         S_ij             = np.zeros((self.I, self.J))
         C_ij             = np.zeros((self.I, self.J))
         available_time_k = self.S_k.copy()
+        dummy_OJSet      = copy.deepcopy(self.OJSet)
 
         Reschedule_completion = False
         # Start
         for j in self.JSet:
             ready_time = self.S_j[j]
-            operation  = [self.OJSet[j][0], j]
+            operation  = [dummy_OJSet[j][0], j]
             if ready_time not in ORDict:
                 ORDict[ready_time] = []
             ORDict[ready_time].append(operation)
 
         ready_time       = min(ORDict)
         ORSet            = ORDict[ready_time]
-        sorted_operation = sorted(ORSet, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0]][x[1]])))
+        sorted_operation = sorted(ORSet, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0], x[1]])))
 
 
         while Reschedule_completion == False:
@@ -205,22 +208,22 @@ class Method:
                 # Select machine
                 if self.n_MC_ji[j][i] == 1:
                     k = self.MC_ji[j][i]
-                    X_ijk[i][j][k] = 1
+                    X_ijk[i, j, k] = 1
                 else:
-                    mask            = np.multiply(self.p_ijk[i][j], self.h_ijk[i][j])
-                    mask[mask==0]   = 999
+                    mask            = np.multiply(self.p_ijk[i, j], self.h_ijk[i, j])
+                    mask[mask==0]   = 99999
                     sum_values      = mask + np.maximum(ready_time, available_time_k)
                     k               = np.argmin(sum_values)
-                    X_ijk[i][j][k]  = 1  
+                    X_ijk[i, j, k]  = 1  
                 # Calculate Start time, Completion time, and set new S_k
-                S_ij[i][j]          = max(ready_time, available_time_k[k])
-                C_ij[i][j]          = S_ij[i][j] + self.p_ijk[i][j][k]
-                available_time_k[k] = copy.deepcopy(C_ij[i][j])
+                S_ij[i, j]          = max(ready_time, available_time_k[k])
+                C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]
+                available_time_k[k] = copy.deepcopy(C_ij[i, j])
                 # Adjust the set and append the dictionary (if any)
-                self.OJSet[j].remove(i)
-                if len(self.OJSet[j]) != 0:
-                    new_ready_time = C_ij[i][j]
-                    operation      = [self.OJSet[j][0], j]
+                dummy_OJSet[j].remove(i)
+                if len(dummy_OJSet[j]) != 0:
+                    new_ready_time = C_ij[i, j]
+                    operation      = [dummy_OJSet[j][0], j]
                     if new_ready_time not in ORDict:
                         ORDict[new_ready_time] = []
                     ORDict[new_ready_time].append(operation)
@@ -229,7 +232,7 @@ class Method:
             if ORDict:
                 ready_time       = min(ORDict)
                 ORSet            = ORDict[ready_time]
-                sorted_operation = sorted(ORSet, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0]][x[1]])))
+                sorted_operation = sorted(ORSet, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0], x[1]])))
             else: Reschedule_completion = True
 
         # Calculate GBest
@@ -244,6 +247,7 @@ class Method:
         X_ijk            = np.zeros((self.I, self.J, self.K))
         S_ij             = np.zeros((self.I, self.J))
         C_ij             = np.zeros((self.I, self.J))
+        S_k              = copy.deepcopy(self.S_k)
         dummy_JSet       = copy.deepcopy(self.JSet)
         dummy_OJSet      = copy.deepcopy(self.OJSet)
 
@@ -262,37 +266,37 @@ class Method:
         while Reschedule_completion == False:
             # Initialize cost matrix with a high value
             num_operations = len(ORSet)
-            cost_matrix    = np.full((num_operations, self.K), 999)
+            cost_matrix    = np.full((num_operations, self.K), 99999)
 
             # Populate the cost matrix based on constraints
             for op_idx, (i, j) in enumerate(ORSet):
                 for k in range(self.K):
-                    if self.h_ijk[i][j][k] == 1:
-                        cost_matrix[op_idx, k] = self.S_k[k] + self.p_ijk[i][j][k]
+                    if self.h_ijk[i, j, k] == 1:
+                        cost_matrix[op_idx, k] = S_k[k] + self.p_ijk[i, j, k]
 
             # Solve the assignment problem using the Hungarian algorithm
             row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
             # Output the assignment results
-            assignments = [(ORSet[row], machine) for row, machine in zip(row_ind, col_ind) if cost_matrix[row, machine] < 999]
+            assignments = [(ORSet[row], machine) for row, machine in zip(row_ind, col_ind) if cost_matrix[row, machine] < 99999]
             new_availabletime = []
             ORDict.pop(ready_time)
             for (i, j), k in assignments:
-                X_ijk[i][j][k]      = 1
-                S_ij[i][j]          = max(ready_time, self.S_k[k])
-                C_ij[i][j]          = S_ij[i][j] + self.p_ijk[i][j][k]
-                self.S_k[k]         = copy.deepcopy(C_ij[i][j])
+                X_ijk[i, j, k]      = 1
+                S_ij[i, j]          = max(ready_time, self.S_k[k])
+                C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
+                S_k[k]         = copy.deepcopy(C_ij[i, j])
                 new_availabletime.append(self.S_k[k])
                 dummy_OJSet[j].remove(i) 
                 
                 if len(dummy_OJSet[j]) != 0:
-                    new_ready_time = copy.deepcopy(C_ij[i][j])
+                    new_ready_time = copy.deepcopy(C_ij[i, j])
                     operation      = [dummy_OJSet[j][0], j]
                     if new_ready_time not in ORDict:
                         ORDict[new_ready_time] = []
                     ORDict[new_ready_time].append(operation)
 
-            assigned_operations = [ORSet[row] for row, machine in zip(row_ind, col_ind) if cost_matrix[row, machine] < 999]
+            assigned_operations = [ORSet[row] for row, machine in zip(row_ind, col_ind) if cost_matrix[row, machine] < 99999]
             unassigned_operations = [op for op in ORSet if op not in assigned_operations]
 
             if unassigned_operations:
@@ -339,25 +343,25 @@ class Method:
         while Reschedule_completion == False:
             # Initialize cost matrix with a high value
             num_operations = len(ORSet)
-            cost_matrix    = np.full((num_operations, self.K), 999)
+            cost_matrix    = np.full((num_operations, self.K), 99999)
 
             # Populate the cost matrix based on constraints
             for op_idx, (i, j) in enumerate(ORSet):
                 for k in range(self.K):
-                    if self.h_ijk[i][j][k] == 1:
-                        cost_matrix[op_idx, k] = self.S_k[k] + self.p_ijk[i][j][k]
+                    if self.h_ijk[i, j, k]  == 1:
+                        cost_matrix[op_idx, k] = self.S_k[k] + self.p_ijk[i, j, k]  
 
             # Solve the assignment problem using the Hungarian algorithm
             row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
             # Output the assignment results
-            assignments = [(ORSet[row], machine) for row, machine in zip(row_ind, col_ind) if cost_matrix[row, machine] < 999]
+            assignments = [(ORSet[row], machine) for row, machine in zip(row_ind, col_ind) if cost_matrix[row, machine] < 99999]
             ORDict.pop(ready_time)
             for (i, j), k in assignments:
-                X_ijk[i][j][k]      = 1
-                S_ij[i][j]          = max(ready_time, self.S_k[k])
-                C_ij[i][j]          = S_ij[i][j] + self.p_ijk[i][j][k]
-                self.S_k[k]         = copy.deepcopy(C_ij[i][j])
+                X_ijk[i, j, k]        = 1
+                S_ij[i, j]          = max(ready_time, self.S_k[k])
+                C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
+                self.S_k[k]         = copy.deepcopy(C_ij[i, j])
                 dummy_OJSet[j].remove(i) 
                 if len(dummy_OJSet[j]) != 0:
                     new_ready_time = C_ij[i][j]
@@ -366,30 +370,30 @@ class Method:
                         ORDict[new_ready_time] = []
                     ORDict[new_ready_time].append(operation)
 
-            assigned_operations = [ORSet[row] for row, machine in zip(row_ind, col_ind) if cost_matrix[row, machine] < 999]
+            assigned_operations = [ORSet[row] for row, machine in zip(row_ind, col_ind) if cost_matrix[row, machine] < 99999]
             unassigned_operations = [op for op in ORSet if op not in assigned_operations]
 
             if unassigned_operations:
-                sorted_operation = sorted(unassigned_operations, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0]][x[1]])))
+                sorted_operation = sorted(unassigned_operations, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0], x[1]])))
                 for i, j in sorted_operation:
                     # Select machine
                     if self.n_MC_ji[j][i] == 1:
                         k = self.MC_ji[j][i]
-                        X_ijk[i][j][k] = 1
+                        X_ijk[i, j, k]  = 1
                     else:
-                        mask            = np.multiply(self.p_ijk[i][j], self.h_ijk[i][j])
+                        mask            = np.multiply(self.p_ijk[i, j], self.h_ijk[i, j])
                         mask[mask==0]   = 999
                         sum_values      = mask + np.maximum(ready_time, self.S_k[k])
                         k               = np.argmin(sum_values)
-                        X_ijk[i][j][k]  = 1  
+                        X_ijk[i, j, k]  = 1  
                     # Calculate Start time, Completion time, and set new S_k
-                    S_ij[i][j]          = max(ready_time, self.S_k[k])
-                    C_ij[i][j]          = S_ij[i][j] + self.p_ijk[i][j][k]
-                    self.S_k[k]         = copy.deepcopy(C_ij[i][j])
+                    S_ij[i, j]          = max(ready_time, self.S_k[k])
+                    C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
+                    self.S_k[k]         = copy.deepcopy(C_ij[i, j])
                     # Adjust the set and append the dictionary (if any)
                     dummy_OJSet[j].remove(i)
                     if len(dummy_OJSet[j]) != 0:
-                        new_ready_time = C_ij[i][j]
+                        new_ready_time = C_ij[i, j]
                         operation      = [dummy_OJSet[j][0], j]
                         if new_ready_time not in ORDict:
                             ORDict[new_ready_time] = []
@@ -413,21 +417,21 @@ class Method:
                                                         X_ijk, S_ij, self.MC_ji, self.n_MC_ji, self.n_ops_left_j,
                                                         self.t)
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
-                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, 
-                                                    self.MC_ji, self.n_MC_ji, self.X_ijk, self.S_ij, self.C_ij, 
+                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, self.MC_ji, self.n_MC_ji, 
                                                     OA, MS, chromosome_len, StartTime, self.maxtime)
         return GBest, X_ijk, S_ij, C_ij, C_j
     
     def LAPH_TS(self):
         StartTime = time()
         GBest, X_ijk, S_ij, C_ij, C_j = self.LAPH()
+
         OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, 
                                                         X_ijk, S_ij, self.MC_ji, self.n_MC_ji, self.n_ops_left_j,
                                                         self.t)
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
-                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, 
-                                                    self.MC_ji, self.n_MC_ji, self.X_ijk, self.S_ij, self.C_ij, 
+                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, self.MC_ji, self.n_MC_ji, 
                                                     OA, MS, chromosome_len, StartTime, self.maxtime)
+
         return GBest, X_ijk, S_ij, C_ij, C_j
     
     def LFOH_GA(self):
@@ -490,18 +494,18 @@ class Method:
             filtered_available  = available[mask]
             filtered_index      = np.argmin(filtered_available)
             k                   = np.arange(len(available))[mask][filtered_index]
-            X_ijk[i][j][k]      = 1  
+            X_ijk[i, j, k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
-            S_ij[i][j]          = max(self.S_j[j], self.S_k[k])
-            C_ij[i][j]          = S_ij[i][j] + self.p_ijk[i][j][k]
-            self.S_k[k]         = copy.deepcopy(C_ij[i][j])
+            S_ij[i, j]          = max(self.S_j[j], self.S_k[k])
+            C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
+            self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             # Adjust the set
             self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
             else:
-                self.S_j[j] = copy.deepcopy(C_ij[i][j])
+                self.S_j[j] = copy.deepcopy(C_ij[i, j])
 
             if not dummy_JSet:
                 Reschedule_completion = True
@@ -543,18 +547,18 @@ class Method:
             filtered_available  = available[mask]
             filtered_index      = np.argmin(filtered_available)
             k                   = np.arange(len(available))[mask][filtered_index]
-            X_ijk[i][j][k]      = 1  
+            X_ijk[i, j, k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
-            S_ij[i][j]          = max(self.S_j[j], self.S_k[k])
-            C_ij[i][j]          = S_ij[i][j] + self.p_ijk[i][j][k]
-            self.S_k[k]         = copy.deepcopy(C_ij[i][j])
+            S_ij[i, j]          = max(self.S_j[j], self.S_k[k])
+            C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
+            self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             # Adjust the set
             self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
             else:
-                self.S_j[j] = copy.deepcopy(C_ij[i][j])
+                self.S_j[j] = copy.deepcopy(C_ij[i, j])
 
             if not dummy_JSet:
                 Reschedule_completion = True
@@ -570,7 +574,7 @@ class Method:
     def CDR3(self):
         for j in self.JSet:
             for i in self.OJSet[j]:
-                self.X_ijk[i][j].fill(0)
+                self.X_ijk[i, j].fill(0)
         S_ij             = np.zeros((self.I, self.J))
         C_ij             = np.zeros((self.I, self.J))
         p_mean           = np.mean(self.p_ijk*self.h_ijk, axis= 2)
@@ -589,18 +593,18 @@ class Method:
             r = random.random()
             workload = np.full(self.K, np.inf)
             for k in self.MC_ji[j][i]:
-                workload[k] = np.sum(self.p_ijk[ope][job][k] * self.X_ijk[ope][job][k] for job in range(self.J) for ope in range(int(self.n_j[job] - self.n_ops_left_j[job])) )
+                workload[k] = np.sum(self.p_ijk[ope, job, k] * self.X_ijk[ope, job, k] for job in range(self.J) for ope in range(int(self.n_j[job] - self.n_ops_left_j[job])) )
             utilization = workload / self.T_cur
 
             if r < 0.5:
                 k = np.argmin(utilization)
             else:
                 k = np.argmin(workload)   
-            self.X_ijk[i][j][k]      = 1  
+            self.X_ijk[i, j, k] = 1  
             # Calculate Start time, Completion time, and set new S_k
-            S_ij[i][j]          = max(self.S_j[j], self.S_k[k])
-            C_ij[i][j]          = S_ij[i][j] + self.p_ijk[i][j][k]
-            self.S_k[k]         = copy.deepcopy(C_ij[i][j])
+            S_ij[i, j]          = max(self.S_j[j], self.S_k[k])
+            C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
+            self.S_k[k]         = copy.deepcopy(C_ij[i, j])
 
             # Adjust the set
             self.OJSet[j].remove(i)
@@ -608,7 +612,7 @@ class Method:
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
             else:
-                self.S_j[j] = copy.deepcopy(C_ij[i][j])
+                self.S_j[j] = copy.deepcopy(C_ij[i, j])
 
             if not dummy_JSet:
                 Reschedule_completion = True
@@ -638,18 +642,18 @@ class Method:
             filtered_available  = available[mask]
             filtered_index      = np.argmin(filtered_available)
             k                   = np.arange(len(available))[mask][filtered_index]
-            X_ijk[i][j][k]      = 1  
+            X_ijk[i, j, k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
-            S_ij[i][j]          = max(self.S_j[j], self.S_k[k])
-            C_ij[i][j]          = S_ij[i][j] + self.p_ijk[i][j][k]
-            self.S_k[k]         = copy.deepcopy(C_ij[i][j])
+            S_ij[i, j]          = max(self.S_j[j], self.S_k[k])
+            C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
+            self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             # Adjust the set
             self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
             else:
-                self.S_j[j]      = copy.deepcopy(C_ij[i][j])
+                self.S_j[j]      = copy.deepcopy(C_ij[i, j])
             if not dummy_JSet:
                 Reschedule_completion = True
 
@@ -672,7 +676,7 @@ class Method:
             if self.Tard_job:
                 InversedCompletionRate_tardiness = np.full(self.J, -np.inf)
                 for j in self.Tard_job:
-                    InversedCompletionRate_tardiness[j] = self.n_j[j]/OP[j] * (self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j])
+                    InversedCompletionRate_tardiness[j] = 0 if OP[j] == 0 else self.n_j[j]/OP[j] * (self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j])
                 j = np.argmax(InversedCompletionRate_tardiness)
             else:
                 CompletionRate_slack = np.full(self.J, np.inf)
@@ -687,18 +691,18 @@ class Method:
             filtered_available  = available[mask]
             filtered_index      = np.argmin(filtered_available)
             k                   = np.arange(len(available))[mask][filtered_index]
-            X_ijk[i][j][k]      = 1  
+            X_ijk[i, j, k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
-            S_ij[i][j]          = max(self.S_j[j], self.S_k[k])
-            C_ij[i][j]          = S_ij[i][j] + self.p_ijk[i][j][k]
-            self.S_k[k]         = copy.deepcopy(C_ij[i][j])
+            S_ij[i, j]          = max(self.S_j[j], self.S_k[k])
+            C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
+            self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             # Adjust the set
             self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
             else:
-                self.S_j[j] = copy.deepcopy(C_ij[i][j])
+                self.S_j[j] = copy.deepcopy(C_ij[i, j])
 
             if not dummy_JSet:
                 Reschedule_completion = True
@@ -735,18 +739,19 @@ class Method:
             
             filtered_index      = np.argmin(filtered_available)
             k                   = np.arange(len(available))[mask][filtered_index]
-            X_ijk[i][j][k]      = 1  
+            X_ijk[i, j, k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
-            S_ij[i][j]          = max(self.S_j[j], self.S_k[k])
-            C_ij[i][j]          = S_ij[i][j] + self.p_ijk[i][j][k]
-            self.S_k[k]         = copy.deepcopy(C_ij[i][j])
+            S_ij[i, j]          = max(self.S_j[j], self.S_k[k])
+            C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
+            self.S_k[k]         = copy.deepcopy(C_ij[i, j])
+            
             # Adjust the set
             self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
             else:
-                self.S_j[j] = copy.deepcopy(C_ij[i][j])
+                self.S_j[j] = copy.deepcopy(C_ij[i, j])
 
             if not dummy_JSet:
                 Reschedule_completion = True
@@ -793,8 +798,8 @@ class Method:
                         ## Check if satisfy equation
                         interval = min(S_Oij_suc, S_k_suc) - self.S_k[k]
                         
-                        if self.p_ijk[i][j][k] < interval:
-                            cost = self.S_k[k] + self.p_ijk[i][j][k]
+                        if self.p_ijk[i, j, k] < interval:
+                            cost = self.S_k[k] + self.p_ijk[i, j, k]  
                             direct_RouteChange  .append(k)
                             cost_Modified       .append(cost)
                         else:
@@ -806,11 +811,11 @@ class Method:
                     min_cost =  min(cost_Modified)
                     k_index  =  cost_Modified.index(min_cost)
                     new_k    =  direct_RouteChange[k_index]
-                    self.X_ijk[i][j][new_k] = 1
-                    self.X_ijk[i][j][breakdown_MC] = 0
+                    self.X_ijk[i, j, new_k] = 1
+                    self.X_ijk[i, j, breakdown_MC] = 0
 
-                    self.S_ij[i][j] = self.S_k[new_k]
-                    self.C_ij[i][j] = self.S_ij[i][j] + self.p_ijk[i][j][new_k]
+                    self.S_ij[i, j] = self.S_k[new_k]
+                    self.C_ij[i, j] = self.S_ij[i, j] + self.p_ijk[i, j, new_k]
 
                 ### If not
                 else:
@@ -835,8 +840,8 @@ class Method:
                     new_k        =  indirect_RouteChange[k_index]
 
                     dummy_X_ijk  =  copy.deepcopy(self.X_ijk)
-                    dummy_X_ijk[i][j][new_k] = 1
-                    dummy_X_ijk[i][j][breakdown_MC] = 0
+                    dummy_X_ijk[i, j, new_k] = 1
+                    dummy_X_ijk[i, j, breakdown_MC] = 0
 
                     ## Change Mch seq
                     dummy_Mch_seq = copy.deepcopy(Mch_seq)
@@ -869,7 +874,7 @@ class Method:
                         else:
                             S_Oij_suc = np.inf
                         
-                        C_Oij = S_Oij + self.p_ijk[i][j][new_k]
+                        C_Oij = S_Oij + self.p_ijk[i, j, new_k]
 
                         dummy_X_ijk   = self.X_ijk.copy()
                         dummy_S_ij    = self.S_ij .copy()
@@ -877,10 +882,10 @@ class Method:
                         dummy_Mch_seq = copy.deepcopy(Mch_seq)
 
                         if C_Oij <= S_Oij_suc:
-                            dummy_X_ijk[i][j][breakdown_MC] = 0
-                            dummy_X_ijk[i][j][new_k] = 1
-                            dummy_S_ij[i][j] = copy.deepcopy(S_Oij)
-                            dummy_C_ij[i][j] = copy.deepcopy(C_Oij)
+                            dummy_X_ijk[i, j, breakdown_MC] = 0
+                            dummy_X_ijk[i, j, new_k] = 1
+                            dummy_S_ij[i, j] = copy.deepcopy(S_Oij)
+                            dummy_C_ij[i, j] = copy.deepcopy(C_Oij)
                             cost_LastPos = evaluate_LocalCost(self.d_j, dummy_C_ij, self.JSet)
                             
                             dummy_Mch_seq[breakdown_MC].remove(Oij)
@@ -900,6 +905,22 @@ class Method:
                     self.S_ij     =  S_modified      [sched_id]
                     self.C_ij     =  C_modified      [sched_id]
                     Mch_seq       =  Mch_seq_modified[sched_id]
+
+        if self.NewJobList:
+            for j, deadline in self.NewJobList:
+                for i in range(self.n_j[j]):
+                    available           = np.maximum(self.S_j[j], self.S_k)
+                    mask                = self.h_ijk[i, j, :] == 1
+                    filtered_available  = available[mask]
+                    
+                    filtered_index      = np.argmin(filtered_available)
+                    k                   = np.arange(len(available))[mask][filtered_index]
+                    self.X_ijk[i, j, k] = 1  
+                    # Calculate Start time, Completion time, and set new S_k
+                    self.S_ij[i, j]     = max(self.S_j[j], self.S_k[k])
+                    self.C_ij[i, j]     = self.S_ij[i, j] + self.p_ijk[i, j, k]  
+                    self.S_k[k]         = copy.deepcopy(self.C_ij[i, j])
+                    self.S_j[j]         = copy.deepcopy(self.C_ij[i, j])
 
         GBest, C_j = evaluate_LocalCost(self.d_j, self.C_ij, self.JSet)
 

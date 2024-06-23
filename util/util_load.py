@@ -78,56 +78,46 @@ def read_txt(filename):
 
     return J, I, K, p_ijk, h_ijk, d_j, n_j, MC_ji, n_MC_ji, OperationPool
 
+def read_scenario (file_path, K, critical_machines):
+    JA_event = []
+    MB_event = [[] for _ in range(K)]
 
-def insert_duedate(filename):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+        current_section = None
 
-    # Read data from the text file
-    with open(filename, "r") as file:
-        data = file.readlines()
+        for line in lines:
+            if 'Defected Jobs' in line:
+                current_section = 'JA'
+                continue
+            elif 'MachineBreakdown' in line:
+                current_section = 'MB'
+                continue
+            elif line.strip() == '':
+                continue
 
-    # Extracting parameters J, K, I
-    J = int(data[0].strip())  # Number of jobs
-    K = int(data[1].strip())  # Number of machines
-    I = max(int(line.split()[1]) for line in data[3:])  # Maximum number of operations per job
+            if current_section == 'JA':
+                parts = line.split(',')
+                if len(parts) == 3:
+                    try:
+                        job_id = int(parts[0].strip())
+                        deadline_info = int(parts[1].strip())
+                        description = parts[2].strip()
+                        JA_event.append((job_id, deadline_info, description))
+                    except ValueError:
+                        # Skip lines that cannot be converted to integer (likely headers or malformed data)
+                        continue
+            elif current_section == 'MB':
+                parts = line.split()
+                if len(parts) == 3:
+                    try:
+                        machine_id = int(parts[0].strip())
+                        bd_time = float(parts[1].strip())
+                        re_time = float(parts[2].strip())
+                        description = "critical" if machine_id in critical_machines else "normal"
+                        MB_event[machine_id - 1].append((bd_time, re_time, description))
+                    except ValueError:
+                        continue
 
-    # Initialize p_ijk matrix, n_j vector, and MC_ji list of lists
-    p_ijk = np.full((I, J, K), 999)
-    h_ijk = np.zeros((I, J, K), dtype=int)
-
-    n_j   = np.zeros(J, dtype=int)
-    MC_ji = [[[] for _ in range(I)] for _ in range(J)]
-
-    # Extract job, operation, machine, and processing time data
-    for line in data[3:]:
-        job, operation, machine, processingtime = map(int, line.split())
-        job       -= 1      # Adjust to 0-based indexing
-        operation -= 1      # Adjust to 0-based indexing
-        machine   -= 1      # Adjust to 0-based indexing
-
-        # Update p_ijk and h_ijk matrix
-        p_ijk[operation, job, machine] = processingtime
-        h_ijk[operation, job, machine] = 1
-
-        # Update n_j vector
-        n_j[job] = max(n_j[job], operation + 1)
-
-        # Update MC_ji list
-        if machine not in MC_ji[job][operation]:
-            MC_ji[job][operation].append(machine)
-
-    weighted_processing_times = p_ijk * h_ijk
-    valid_machines            = np.sum(h_ijk, axis=2)
-    p_ij                      = np.divide(weighted_processing_times.sum(axis=2), valid_machines, where=(valid_machines!=0))
-    p_ij[valid_machines == 0] = 0
-    d_j                       = np.round((np.random.uniform(50, 150, size=J) * np.sum(p_ij, axis=0)),0).astype(int)
-
-    d_j_str = ' '.join(str(int(value)) for value in d_j)
-
-    # Insert the new line after line 3 (index 2)
-    data.insert(3, d_j_str + '\n')
-
-    # Write the modified content back to the file
-    with open(filename, 'w') as file:
-        file.writelines(data)
-
-    return
+    return JA_event, MB_event
+    
