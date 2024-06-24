@@ -57,8 +57,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		self.MC_ji				= self.current_instance.MC_ji
 		self.n_MC_ji 			= self.current_instance.n_MC_ji
 		self.OperationPool 		= self.current_instance.OperationPool
-		self.LB_Cmax            = np.sum(np.mean(self.p_ijk*self.h_ijk, axis= 2))
-		self.RealK              = np.sum(np.max(self.h_ijk, axis= (0, 1)))
+		self.n_Mch              = np.sum(np.max(self.h_ijk, axis= (0, 1)))/self.K
 
 	def load_scenario(self, scenario_id):
 		self.current_scenario 	= self.scenarios[scenario_id]
@@ -71,10 +70,10 @@ class FJSP_under_uncertainties_Env(gym.Env):
 
 	def calc_observation (self):
 		# Find utilization of each machine
-		U_k       = np.zeros((self.K))
-		Usage     = np.sum(self.X_ijk * self.p_ijk * self.h_ijk, axis = (0, 1))
-		mask      = self.CT_k != 0
-		U_k[mask] = Usage[mask] / self.CT_k[mask]
+		U_k       	 = np.zeros((self.K))
+		Usage     	 = np.sum(self.X_ijk * self.p_ijk * self.h_ijk, axis = (0, 1))
+		mask      	 = self.CT_k != 0
+		filtered_U_k = Usage[mask] / self.CT_k[mask]
 		
 		# Find completion rate of each job
 		CR_j = 1 - self.n_ops_left_j/self.n_j
@@ -105,20 +104,20 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		
 		
 		# Problem size features
-		n_Job  = len(self.JSet)				# 1. Number of job left
-		n_Ops  = sum(map(len, self.OJSet))	# 2. Number of operation left
-		n_Mch  = copy.deepcopy(self.RealK)	# 3. Number of machine
+		n_Job  = len(self.JSet)						# 1. Number of job left 		- normalize
+		n_Ops  = sum(map(len, self.OJSet))			# 2. Number of operation left 	- normalize
+													# 3. Number of machine 			- normalize
 		# Scenario features (taken from snapshot)
 		# Enviroment status	features	
-		U_ave  = np.mean(U_k)				# 1. Average machine utilization
-		U_std  = np.std(U_k) 				# 2. Std of machine utilization
-		C_all  = n_Ops/np.sum(self.n_j)		# 3. Completion rate of all operation
-		C_ave  = np.mean(CR_j)				# 4. Average completion rate
-		C_std  = np.std(CR_j)				# 5. Std of completion rate
-		Tard_e = Ne_tard/Ne_left 	    	# 6. Estimate tardiness rate
-		Tard_a = Na_tard/Na_left		    # 7. Actual tardiness rate
+		U_ave  = np.mean(filtered_U_k)				# 1. Average machine utilization
+		U_std  = np.std(filtered_U_k) 				# 2. Std of machine utilization
+		C_all  = n_Ops/np.sum(self.n_j)				# 3. Completion rate of all operation
+		C_ave  = np.mean(CR_j)						# 4. Average completion rate
+		C_std  = np.std(CR_j)						# 5. Std of completion rate
+		Tard_e = Ne_tard/Ne_left 	    			# 6. Estimate tardiness rate
+		Tard_a = Na_tard/Na_left		    		# 7. Actual tardiness rate
 
-		observation = 	[n_Job, n_Ops, n_Mch, 
+		observation = 	[n_Job, n_Ops, self.n_Mch, 
 				 		self.JA_boolean, self.JA_long_boolean, self.JA_urgent_boolean,
         				self.MB_boolean, self.MB_critical_boolean, self.sum_re,
 					   	U_ave, U_std, C_all, C_ave, C_std, Tard_e, Tard_a]
@@ -130,7 +129,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		filtered_Tard = np.sum(np.maximum(self.C_j[ConsideredJob] - self.d_j[ConsideredJob], 0))
 		self.all_Tard = np.sum(np.maximum(self.C_j - self.d_j, 0))
 
-		self.reward   = -(self.all_Tard*0.01 + filtered_Tard*0.99)/self.LB_Cmax
+		self.reward   = -(self.all_Tard*0.01 + filtered_Tard*0.99)/self.planning_horizon
 		self.pre_JSet = copy.deepcopy(self.JSet)	
 
 	def perform_action(self):
@@ -215,9 +214,9 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		# Reset input
 		self.t                  	   = 0
 		if self.fixed_instance == True:
-			self.load_instance('fixed_instance')
+			self.load_instance('_fixed_instance')
 			if self.fixed_scenario == True:
-				self.load_scenario('fixed_scenario')
+				self.load_scenario('_fixed_scenario')
 			else:
 				self.load_scenario(random.choice(self.list_scenario))
 		else:

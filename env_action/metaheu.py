@@ -130,10 +130,9 @@ def crossover(population, parent_indices, child_indices, crossover_rate, chromos
         if random.random() <= crossover_rate:
             offspring1 = parent1[0].copy(), parent1[1].copy()
             offspring2 = parent2[0].copy(), parent2[1].copy()
-
+            point = random.randint(1, chromosome_len - 1)
             # Perform crossover for each chromosome
             for chromosome in range(2):
-                point = random.randint(1, chromosome_len - 1)
                 offspring1[chromosome][:point] = parent1[chromosome][:point].copy()
                 offspring1[chromosome][point:] = parent2[chromosome][point:].copy()
                 offspring2[chromosome][:point] = parent2[chromosome][:point].copy()
@@ -195,7 +194,7 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
     
     #Population Size = N
     max_Generation      = 500
-    max_No_improve      = 10
+    max_No_improve      = 15
     GBest               = float('inf')
     crossover_rate      = 0.7
     mutation_rate       = 0.3

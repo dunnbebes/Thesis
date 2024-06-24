@@ -387,7 +387,7 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
     # Observation --------------------------------------------------------------------    
     JA_boolean = 1 if JA else 0
     MB_boolean = 1 if any(breakdown for breakdown in MB) else 0
-    sum_re     = np.sum(re)
+    sum_re     = np.sum(re)/(60*60*3)
     # Find completion time of last operation assigned to machine k at rescheduling point t
     CT_k = np.zeros(K)
     for k in range(K):  
