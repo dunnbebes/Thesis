@@ -1,7 +1,0 @@
-Defected Jobs
-JobID, Deadline_info, Description
-
-MachineBreakdown
-MachineID, BD_time, 	Re_time
-8         21180.0        2700.0         
-13        20640.0        1380.0         

@@ -1,6 +1,0 @@
-Defected Jobs
-JobID, Deadline_info, Description
-7		, 57600		, loose
-
-MachineBreakdown
-MachineID, BD_time, 	Re_time

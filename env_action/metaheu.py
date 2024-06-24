@@ -131,10 +131,9 @@ def crossover(population, parent_indices, child_indices, crossover_rate, chromos
             offspring1 = parent1[0].copy(), parent1[1].copy()
             offspring2 = parent2[0].copy(), parent2[1].copy()
 
-            point = random.randint(1, chromosome_len - 1)
-
             # Perform crossover for each chromosome
             for chromosome in range(2):
+                point = random.randint(1, chromosome_len - 1)
                 offspring1[chromosome][:point] = parent1[chromosome][:point].copy()
                 offspring1[chromosome][point:] = parent2[chromosome][point:].copy()
                 offspring2[chromosome][:point] = parent2[chromosome][:point].copy()

@@ -457,7 +457,7 @@ def generate_random_event (J, K, planning_horizon, WeibullDistribution, critical
             t       += downtime
             uptime   = math.ceil(weibull_min.rvs(c=shape_up, loc=0, scale=scale_up))*60 # change to second
             count    = 0
-            while uptime < 600:
+            while uptime < 300:
                 uptime   = math.ceil(weibull_min.rvs(c=shape_up, loc=0, scale=scale_up))*60 # change to second
                 count += 1
                 if count == 10:

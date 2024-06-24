@@ -14,7 +14,7 @@ from util.util_reschedule    import store_schedule, update_schedule, random_even
 class FJSP_under_uncertainties_Env(gym.Env):
 	"""Custom Environment that follows gym interface"""
 
-	def __init__(self, fixed_instance, fixed_scenario, instances, scenarios, WeibullDistribution, 
+	def __init__(self, fixed_instance, fixed_scenario, instances, scenarios, K, WeibullDistribution, 
 			  critical_machines, ReworkProbability, planning_horizon, PopSize, maxtime):
 		super(FJSP_under_uncertainties_Env, self).__init__()
 
@@ -28,7 +28,9 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		self.fixed_instance			 	= copy.deepcopy(fixed_instance)
 		self.fixed_scenario			 	= copy.deepcopy(fixed_scenario)
 		self.instances 					= copy.deepcopy(instances)
-		self.scenario			     	= copy.deepcopy(scenario)
+		self.scenarios			     	= copy.deepcopy(scenarios)
+		self.list_instances				= list(self.instances.keys())
+		self.list_scenarios 			= list(self.scenarios.keys())
 		self.num_scenario_per_instance 	= 10
 
 		self.method_list 			 = ["exact", "GA", "LFOH", "LAPH", "LAP_LFO", 
@@ -41,23 +43,24 @@ class FJSP_under_uncertainties_Env(gym.Env):
 											shape=(16,), dtype=np.float32)
 
 	def load_instance(self, instance_id):
-        self.current_instance 	= self.instances[instance_id]
-        self.J 					= self.current_instance.J
-        self.I 					= self.current_instance.I
-        self.X_ijk 				= self.current_instance.X_ijk
-        self.S_ij 				= self.current_instance.S_ij
-        self.C_ij 				= self.current_instance.C_ij
-        self.C_j 				= self.current_instance.C_j
-        self.p_ijk 				= self.current_instance.p_ijk
-        self.h_ijk 				= self.current_instance.h_ijk
-        self.d_j 				= self.current_instance.d_j
-        self.n_j 				= self.current_instance.n_j
-        self.MC_ji				= self.current_instance.MC_ji
-        self.n_MC_ji 			= self.current_instance.n_MC_ji
-        self.OperationPool 		= self.current_instance.OperationPool
+		self.current_instance 	= self.instances[instance_id]
+		self.J 					= self.current_instance.J
+		self.I 					= self.current_instance.I
+		self.X_ijk 				= self.current_instance.X_ijk
+		self.S_ij 				= self.current_instance.S_ij
+		self.C_ij 				= self.current_instance.C_ij
+		self.C_j 				= self.current_instance.C_j
+		self.p_ijk 				= self.current_instance.p_ijk
+		self.h_ijk 				= self.current_instance.h_ijk
+		self.d_j 				= self.current_instance.d_j
+		self.n_j 				= self.current_instance.n_j
+		self.MC_ji				= self.current_instance.MC_ji
+		self.n_MC_ji 			= self.current_instance.n_MC_ji
+		self.OperationPool 		= self.current_instance.OperationPool
 		self.LB_Cmax            = np.sum(np.mean(self.p_ijk*self.h_ijk, axis= 2))
+		self.RealK              = np.sum(np.max(self.h_ijk, axis= (0, 1)))
 
-    def load_scenario(self, scenario_id):
+	def load_scenario(self, scenario_id):
 		self.current_scenario 	= self.scenarios[scenario_id]
 		self.JA_event 	        = self.current_scenario.JA_event
 		self.MB_event 			= self.current_scenario.MB_event
@@ -104,7 +107,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		# Problem size features
 		n_Job  = len(self.JSet)				# 1. Number of job left
 		n_Ops  = sum(map(len, self.OJSet))	# 2. Number of operation left
-		n_Mch  = copy.deepcopy(self.K)		# 3. Number of machine
+		n_Mch  = copy.deepcopy(self.RealK)	# 3. Number of machine
 		# Scenario features (taken from snapshot)
 		# Enviroment status	features	
 		U_ave  = np.mean(U_k)				# 1. Average machine utilization
