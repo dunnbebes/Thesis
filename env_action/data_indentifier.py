@@ -21,12 +21,4 @@ class InstanceData:
 @dataclass
 class ScenarioData:
     JA_event:       list
-    MB_event:       list
-
-
-instances = {
-    "instance_1": InstanceData(X_ijk=np.random.rand(5, 5, 5), S_ij=np.random.rand(5, 5), C_ij=np.random.rand(5, 5), J=5, I=5),
-    "instance_2": InstanceData(X_ijk=np.random.rand(6, 6, 6), S_ij=np.random.rand(6, 6), C_ij=np.random.rand(6, 6), J=6, I=6),
-    # Add more instances as needed
-}
-    
+    MB_event:       list 

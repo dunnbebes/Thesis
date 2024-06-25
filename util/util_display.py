@@ -28,8 +28,8 @@ def plot(J, K, n_j, X_ijk, S_ij, C_ij, MB_record, t):
             for i in range(int(n_j[j])):
                 if X_ijk[i][j][k] == 1:
                     # Convert start and completion times to datetime objects
-                    start_time = start_date + datetime.timedelta(seconds=S_ij[i][j])
-                    completion_time = start_date + datetime.timedelta(seconds=C_ij[i][j])
+                    start_time = start_date + datetime.timedelta(seconds=int(S_ij[i][j]))
+                    completion_time = start_date + datetime.timedelta(seconds=int(C_ij[i][j]))
                     
                     gantt_data.append(dict(Task=f'Machine {k+1}', Start=start_time, Finish=completion_time,
                                            Resource=f'Job {j}'))

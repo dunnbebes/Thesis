@@ -201,7 +201,6 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
     tournament_size     = 3
     
     fitness             = np.zeros(N)
-
     if chromosome_len >= 2:
         value_counts    = dict(zip(OperationPool['Job'], OperationPool['Num operation left']))
         fitness         = evaluate               (population, range(N), chromosome_len, fitness, 
@@ -228,10 +227,9 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
             else:
                 no_improve += 1
 
-
             generation += 1
             elapsed_time = time.time() - StartTime
-    
+
         sum_tardiness, X_ijk, S_ij, C_ij, C_j = decoding(S_k, S_j, G_OA, G_MS, chromosome_len, 
                                                     n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
 
@@ -349,7 +347,7 @@ def TabuSearch (S_k, S_j, JSet, J, I, K,
                 MC_ji, n_MC_ji, OA, MS, chromosome_len, StartTime, maxtime):
 
     max_Generation                 = 500
-    max_No_improve                 = 10
+    max_No_improve                 = 15
     GBest                          = float('inf')
     tabu_list_size                 = 10
     neighborhood_size              = 5

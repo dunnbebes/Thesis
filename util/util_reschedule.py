@@ -117,18 +117,20 @@ def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record
     have_event      = False
     for job, deadline, description in JA_event:
         have_event  = True
-        time_occur  = C_j[job]
-        if time_occur not in events:
-            events[time_occur] = []
-        events[time_occur].append(("JA", job, deadline, description))
+        time_occur  = np.max(C_ij[:,job])
+        if time_occur > t:
+            if time_occur not in events:
+                events[time_occur] = []
+            events[time_occur].append(("JA", job, deadline, description))
 
     for k in range(K):
         if MB_event[k]:
             have_event  = True
             time_occur, repair, description = MB_event[k][0]
-            if time_occur not in events:
-                events[time_occur] = []
-            events[time_occur].append(("MB", k, repair, description))
+            if time_occur > t:
+                if time_occur not in events:
+                    events[time_occur] = []
+                events[time_occur].append(("MB", k, repair, description))
     
     re            = np.zeros((K)) 
     if have_event == True:
@@ -197,7 +199,7 @@ def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record
         new_time = np.max(C_j)
         triggered_event = None  
         affected_Oij = {}   
-
+    
     return JA_event, MB_event, new_time, triggered_event, affected_Oij, re, MB_record
 
     
@@ -422,7 +424,9 @@ def update_schedule(DSet, ODSet, X_ijk, S_ij, C_ij, X_previous, S_previous, C_pr
             X_ijk[i, j] = copy.deepcopy(X_previous[i, j])
             S_ij [i, j] = copy.deepcopy(S_previous[i, j])
             C_ij [i, j] = copy.deepcopy(C_previous[i, j])
-    return X_ijk, S_ij, C_ij
+    
+    C_j = np.max(C_ij, axis=0)
+    return X_ijk, S_ij, C_ij, C_j
 
 def generate_random_event (J, K, planning_horizon, WeibullDistribution, critical_machines, ReworkProbability):
     JA_event = []

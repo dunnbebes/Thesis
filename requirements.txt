@@ -1,4 +1,12 @@
-numpy
-pandas
-stable
-pickle
+cplex==22.1.1.2
+numpy==1.26.4
+ortools==9.6.2534
+pandas==2.2.1
+plotly==5.19.0
+protobuf==4.25.3
+pulp==2.8.0
+stable_baselines3[extra]
+tensorflow==2.16.1
+tensorboard==2.16.2
+XlsxWriter==3.2.0
+xlwings==0.29.1

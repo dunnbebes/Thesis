@@ -1,0 +1,7 @@
+Defected Jobs
+JobID, Deadline_info, Description
+
+MachineBreakdown
+MachineID, BD_time, 	Re_time
+4         20.0         540.0          
+20        20.0        7920.0         

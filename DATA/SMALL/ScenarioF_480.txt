@@ -1,0 +1,26 @@
+Defected Jobs
+JobID, Deadline_info, Description
+60        , 2         , urgent    
+71        , 9         , urgent    
+99        , 3         , urgent    
+114       , 1         , urgent    
+139       , 9         , urgent    
+176       , 1         , urgent    
+236       , 10        , urgent    
+247       , 2         , urgent    
+282       , 1         , urgent    
+308       , 7         , urgent    
+350       , 5         , urgent    
+418       , 7         , urgent    
+419       , 8         , urgent    
+489       , 2         , urgent    
+507       , 5         , urgent    
+545       , 4         , urgent    
+568       , 7         , urgent    
+571       , 5         , urgent    
+583       , 4         , urgent    
+617       , 9         , urgent    
+630       , 9         , urgent    
+
+MachineBreakdown
+MachineID, BD_time, 	Re_time

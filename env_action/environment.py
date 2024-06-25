@@ -33,31 +33,37 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		self.list_scenarios 			= list(self.scenarios.keys())
 		self.num_scenario_per_instance 	= 10
 
-		self.method_list 			 = ["exact", "GA", "LFOH", "LAPH", "LAP_LFO", 
+		self.method_list 			 = ["GA", "TS", "LFOH", "LAPH", "LAP_LFO", 
 						  				"LFOH-TS", "LAPH-TS", "LFOH-GA", "LAPH-GA",
 						  				"CDR1", "CDR2", "CDR3", "CDR4", "CDR5", "CDR6",
 										"RCRS"]
 
 		self.action_space = spaces.Discrete(16)
-		self.observation_space = spaces.Box(low=0, high=255,
+		self.observation_space = spaces.Box(low=0, high=2,
 											shape=(16,), dtype=np.float32)
 
 	def load_instance(self, instance_id):
 		self.current_instance 	= self.instances[instance_id]
-		self.J 					= self.current_instance.J
-		self.I 					= self.current_instance.I
-		self.X_ijk 				= self.current_instance.X_ijk
-		self.S_ij 				= self.current_instance.S_ij
-		self.C_ij 				= self.current_instance.C_ij
-		self.C_j 				= self.current_instance.C_j
-		self.p_ijk 				= self.current_instance.p_ijk
-		self.h_ijk 				= self.current_instance.h_ijk
-		self.d_j 				= self.current_instance.d_j
-		self.n_j 				= self.current_instance.n_j
-		self.MC_ji				= self.current_instance.MC_ji
-		self.n_MC_ji 			= self.current_instance.n_MC_ji
-		self.OperationPool 		= self.current_instance.OperationPool
+		self.J 					= copy.deepcopy(self.current_instance.J)
+		self.I 					= copy.deepcopy(self.current_instance.I)
+		self.X_ijk 				= copy.deepcopy(self.current_instance.X_ijk)
+		self.S_ij 				= copy.deepcopy(self.current_instance.S_ij)
+		self.C_ij 				= copy.deepcopy(self.current_instance.C_ij)
+		self.C_j 				= copy.deepcopy(self.current_instance.C_j)
+		self.p_ijk 				= copy.deepcopy(self.current_instance.p_ijk)
+		self.h_ijk 				= copy.deepcopy(self.current_instance.h_ijk)
+		self.d_j 				= copy.deepcopy(self.current_instance.d_j)
+		self.n_j 				= copy.deepcopy(self.current_instance.n_j)
+		self.MC_ji				= copy.deepcopy(self.current_instance.MC_ji)
+		self.n_MC_ji 			= copy.deepcopy(self.current_instance.n_MC_ji)
+		self.OperationPool 		= copy.deepcopy(self.current_instance.OperationPool)
 		self.n_Mch              = np.sum(np.max(self.h_ijk, axis= (0, 1)))/self.K
+		self.org_J              = copy.deepcopy(self.J)
+		self.org_p_ijk      	= copy.deepcopy(self.p_ijk)
+		self.org_h_ijk      	= copy.deepcopy(self.h_ijk)
+		self.org_n_j        	= copy.deepcopy(self.n_j)
+		self.org_MC_ji      	= copy.deepcopy(self.MC_ji)
+		self.org_n_MC_ji    	= copy.deepcopy(self.n_MC_ji)
 
 	def load_scenario(self, scenario_id):
 		self.current_scenario 	= self.scenarios[scenario_id]
@@ -104,8 +110,8 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		
 		
 		# Problem size features
-		n_Job  = len(self.JSet)						# 1. Number of job left 		- normalize
-		n_Ops  = sum(map(len, self.OJSet))			# 2. Number of operation left 	- normalize
+		n_Job  = len(self.JSet)/3000				# 1. Number of job left 		- normalize
+		n_Ops  = sum(map(len, self.OJSet))/6000		# 2. Number of operation left 	- normalize
 													# 3. Number of machine 			- normalize
 		# Scenario features (taken from snapshot)
 		# Enviroment status	features	
@@ -141,8 +147,9 @@ class FJSP_under_uncertainties_Env(gym.Env):
 						self.NewJobList, self.PopSize, self.maxtime)
 		
 		return [
-          method.exact
-        , method.GA
+        #   method.exact
+          method.GA
+		, method.TS
         , method.LFOH
         , method.LAPH
         , method.LAP_LFO
@@ -173,7 +180,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		reschedule							         = action_method[action]
 		self.GBest, \
 		self.X_ijk, self.S_ij, self.C_ij, self.C_j   = reschedule()
-		self.X_ijk, self.S_ij, self.C_ij             = update_schedule(self.DSet, self.ODSet, self.X_ijk, self.S_ij, self.C_ij,\
+		self.X_ijk, self.S_ij, self.C_ij, self.C_j   = update_schedule(self.DSet, self.ODSet, self.X_ijk, self.S_ij, self.C_ij,\
 																       self.X_previous, self.S_previous, self.C_previous)
 
 		# ---------------------------------------- State transition ------------------------------------------
@@ -195,7 +202,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 																					self.org_MC_ji, self.org_n_MC_ji, self.C_j                              )																				
 
 		# --------------------------------- Terminated, Reward,  Observation  ------------------------------------
-		if self.t >= np.max(self.C_ij): 
+		if self.t >= np.max(self.C_ij) or self.triggered_event is None: 
 			self.done = True
 		
 		self.calc_reward()
@@ -213,16 +220,16 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		super().reset(seed=seed)
 		# Reset input
 		self.t                  	   = 0
-		if self.fixed_instance == True:
+		if self.fixed_instance:
 			self.load_instance('_fixed_instance')
-			if self.fixed_scenario == True:
+			if self.fixed_scenario:
 				self.load_scenario('_fixed_scenario')
 			else:
-				self.load_scenario(random.choice(self.list_scenario))
+				self.load_scenario(random.choice(self.list_scenarios))
 		else:
 			if self.num_scenario_per_instance >= 10:
 				self.num_scenario_per_instance = 0
-				self.instance_id 			   = random.choice(self.list_instance)
+				self.instance_id 			   = random.choice(self.list_instances)
 			self.num_scenario_per_instance +=1
 			self.load_instance(self.instance_id)
 			self.JA_event, self.MB_event = generate_random_event(self.J, self.K, self.planning_horizon, self.WeibullDistribution, 
