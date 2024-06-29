@@ -5,8 +5,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import numpy  as np
 import copy
 import random
-from time                   import time
-from pulp                   import *
+import time  
+from time                   import time  
+from pulp                   import *                           
 from env_action.metaheu     import random_population, GeneticAlgorithm, encode_schedule, generate_neighborhood, TabuSearch
 from util.util_action       import find_Mch_seq, evaluate_LocalCost, RightShift
 from scipy.optimize         import linear_sum_assignment
@@ -14,17 +15,14 @@ from scipy.optimize         import linear_sum_assignment
 
 def action_space(J, I, K, p_ijk, h_ijk, d_j, n_j, 
                  MC_ji, n_MC_ji, n_ops_left_j, OperationPool, S_k, S_j, 
-                 JSet, OJSet, Oij_on_machine, affected_Oij, 
-                 t, X_ijk, S_ij, C_ij, C_j, CT_k, T_cur, Tard_job,
-                 NewJobList, PopSize, maxtime):
+                 JSet, OJSet, t, X_ijk, S_ij, C_ij, C_j, CT_k, T_cur, Tard_job,
+                 NewJobList, MBList, PopSize, maxtime, re):
     method = Method(J, I, K, p_ijk, h_ijk, d_j, n_j, 
                     MC_ji, n_MC_ji, n_ops_left_j, OperationPool, S_k, S_j, 
-                    JSet, OJSet, Oij_on_machine, affected_Oij, 
-                    t, X_ijk, S_ij, C_ij, C_j, CT_k, T_cur, Tard_job,
-                    NewJobList, PopSize, maxtime)
+                    JSet, OJSet, t, X_ijk, S_ij, C_ij, C_j, CT_k, T_cur, Tard_job,
+                    NewJobList, MBList, PopSize, maxtime, re)
     return [
-        #    method.exact
-          method.GA
+        method.GA
         , method.TS
         , method.LFOH
         , method.LAPH
@@ -46,9 +44,8 @@ def action_space(J, I, K, p_ijk, h_ijk, d_j, n_j,
 class Method:
     def __init__(self, J, I, K, p_ijk, h_ijk, d_j, n_j, 
                  MC_ji, n_MC_ji, n_ops_left_j, OperationPool, S_k, S_j, 
-                 JSet, OJSet, Oij_on_machine, affected_Oij, 
-                 t, X_ijk, S_ij, C_ij, C_j, CT_k, T_cur, Tard_job,
-                 NewJobList, PopSize, maxtime):
+                 JSet, OJSet, t, X_ijk, S_ij, C_ij, C_j, CT_k, T_cur, Tard_job,
+                 NewJobList, MBList, PopSize, maxtime, re):
         
         self.J     			= copy.deepcopy(J)
         self.I 	    		= copy.deepcopy(I)
@@ -65,8 +62,6 @@ class Method:
         self.S_j            = copy.deepcopy(S_j)
         self.JSet           = copy.deepcopy(JSet)
         self.OJSet          = copy.deepcopy(OJSet)
-        self.Oij_on_machine = copy.deepcopy(Oij_on_machine)
-        self.affected_Oij   = copy.deepcopy(affected_Oij)
         self.X_ijk          = copy.deepcopy(X_ijk)
         self.S_ij           = copy.deepcopy(S_ij)
         self.C_ij           = copy.deepcopy(C_ij)
@@ -76,173 +71,217 @@ class Method:
         self.Tard_job       = copy.deepcopy(Tard_job)
         self.t              = copy.deepcopy(t)
         self.NewJobList     = copy.deepcopy(NewJobList)
+        self.MBList         = copy.deepcopy(MBList)
         self.PopSize        = copy.deepcopy(PopSize)
         self.maxtime        = copy.deepcopy(maxtime)
+        self.re             = copy.deepcopy(re)
 
 
     # def exact(self):
-    #     warnings.filterwarnings('ignore', 'Spaces are not permitted in the name')
-    #     from pulp import HiGHS_CMD
+    #     warnings.filterwarnings('ignore', 'Spaces are not permitted in the name')        
+    #     StartTime = time()
     #     M = 10000
+
     #     # Create the LP problem
     #     problem = LpProblem("Flexible Job Shop Problem", LpMinimize)
 
-    #     # Decision variables
-    #     X_ijk= [[[LpVariable(f"X_{i}_{j}_{k}", cat='Binary') for k in range(self.K)] for j in range(self.J)] for i in range(self.I)]
-    #     Y_ijab= [[[[LpVariable(f"Y_{i}_{j}_{a}_{b}", cat='Binary') for b in range(self.J)] for a in range(self.I)] for j in range(self.J)] for i in range(self.I)]
+    #     class TimeoutException(Exception):
+    #         pass
 
-    #     S_ij= [[LpVariable(f"S_{i}_{j}", lowBound=0, cat='Integer') for j in range(self.J)] for i in range(self.I)]
-    #     C_ij= [[LpVariable(f"C_{i}_{j}", lowBound=0, cat='Integer') for j in range(self.J)] for i in range(self.I)]
-    #     C_j= [LpVariable(f"C_{j}", lowBound=0, cat='Integer') for j in range(self.J)]
-    #     T_j= [LpVariable(f"T_{j}", lowBound=0, cat='Integer') for j in range(self.J)]
-
-    #     # Constraints
-    #     for j in self.JSet:
-    #         for i in self.OJSet[j]:
-    #             problem += lpSum(X_ijk[i][j][k] for k in self.MC_ji[j][i]) == 1
-    #             problem += S_ij[i][j] >= lpSum(X_ijk[i][j][k]*self.S_k[k] for k in self.MC_ji[j][i])
-    #             problem += S_ij[i][j] >= self.S_j[j]
-
-    #             if i != int(self.n_j[j]) - 1:
-    #                 problem += S_ij[i][j] + lpSum(X_ijk[i][j][k] * self.p_ijk[i, j, k] for k in self.MC_ji[j][i]) <= S_ij[i+1][j]
-
-    #             for b in self.JSet:
-    #                 for a in self.OJSet[b]:
-    #                     if j < b:
-    #                         MC_common = set(self.MC_ji[j][i]).intersection(set(self.MC_ji[b][a]))
-    #                         for k in MC_common:
-    #                             problem += S_ij[i][j] >= S_ij[a][b] + self.p_ijk[a, b, k] - M * (2 - X_ijk[i][j][k] - X_ijk[a][b][k] + Y_ijab[i][j][a][b])
-    #                             problem += S_ij[a][b] >= S_ij[i][j] + self.p_ijk[i, j, k] - M * (3 - X_ijk[i][j][k] - X_ijk[a][b][k] - Y_ijab[i][j][a][b])
+    #     try:
+    #         # Decision variables
+    #         X_ijk= [[[LpVariable(f"X_{i}_{j}_{k}", cat='Binary') for k in range(self.K)] for j in range(self.J)] for i in range(self.I)]
+    #         Y_ijab= [[[[LpVariable(f"Y_{i}_{j}_{a}_{b}", cat='Binary') for b in range(self.J)] for a in range(self.I)] for j in range(self.J)] for i in range(self.I)]
             
-    #             problem += C_ij[i][j] == S_ij[i][j] + lpSum(X_ijk[i][j][k] * self.p_ijk[i, j, k] for k in self.MC_ji[j][i])
-    #         problem += C_j[j] == C_ij[int(self.n_j[j])-1][j]
-    #         problem += T_j[j] >= C_j[j] - self.d_j[j]
+    #         print("after Y_ijab", time())
+    #         if time() - StartTime > self.maxtime/5:
+    #             raise TimeoutException("Time limit exceeded")
+            
+    #         S_ij= [[LpVariable(f"S_{i}_{j}", lowBound=0, cat='Integer') for j in range(self.J)] for i in range(self.I)]
+    #         C_ij= [[LpVariable(f"C_{i}_{j}", lowBound=0, cat='Integer') for j in range(self.J)] for i in range(self.I)]
+    #         C_j= [LpVariable(f"C_{j}", lowBound=0, cat='Integer') for j in range(self.J)]
+    #         T_j= [LpVariable(f"T_{j}", lowBound=0, cat='Integer') for j in range(self.J)]  
 
-   
-    #     problem.setObjective(lpSum([T_j[j] for j in self.JSet]))
-    #     # solver = PULP_CBC_CMD(timeLimit=10, msg=True)
-    #     # problem.solve(pulp.PULP_CBC_CMD(timeLimit=2))
-    #     # problem.solve(PULP_CBC_CMD(msg=1, maxSeconds=10))
-    #     # problem.solve(HiGHS_CMD(time_limit=10))
+    #         # Model
+    #         for j in self.JSet:
+    #             if time() - StartTime > self.maxtime/3:
+    #                 raise TimeoutException("Time limit exceeded")
+                
+    #             for i in self.OJSet[j]:                    
+    #                 problem += lpSum(X_ijk[i][j][k] for k in range(self.K)) == 1
+    #                 for k in range(self.K):
+    #                     problem += X_ijk[i][j][k] <= self.h_ijk[i, j, k]
+    #                 problem += S_ij[i][j] >= lpSum(X_ijk[i][j][k]*self.S_k[k] for k in self.MC_ji[j][i])
+    #                 problem += S_ij[i][j] >= self.S_j[j]
 
-    #     #Build the solverModel for your preferred
-    #     solver = pulp.CPLEX_PY()
-    #     solver.buildSolverModel(problem)
+    #                 if i != int(self.n_j[j]) - 1:
+    #                     problem += S_ij[i][j] + lpSum(X_ijk[i][j][k] * self.p_ijk[i, j, k] for k in self.MC_ji[j][i]) <= S_ij[i+1][j]
 
-    #     #Modify the solvermodel
-    #     solver.solverModel.parameters.timelimit.set(10)
+    #                 for b in self.JSet:                        
+    #                     if j < b:
+    #                         for a in self.OJSet[b]:
+    #                             MC_common = set(self.MC_ji[j][i]).intersection(set(self.MC_ji[b][a]))
+    #                             for k in MC_common:
+    #                                 problem += S_ij[i][j] >= S_ij[a][b] + self.p_ijk[a, b, k] - M * (2 - X_ijk[i][j][k] - X_ijk[a][b][k] + Y_ijab[i][j][a][b])
+    #                                 problem += S_ij[a][b] >= S_ij[i][j] + self.p_ijk[i, j, k] - M * (3 - X_ijk[i][j][k] - X_ijk[a][b][k] - Y_ijab[i][j][a][b])        
 
-    #     #Solve P
-    #     solver.callSolver(problem)
-    #     status = solver.findSolutionValues(problem)
+    #                 problem += C_ij[i][j] == S_ij[i][j] + lpSum(X_ijk[i][j][k] * self.p_ijk[i, j, k] for k in self.MC_ji[j][i])
+    #             problem += C_j[j] == C_ij[int(self.n_j[j])-1][j]
+    #             problem += T_j[j] >= C_j[j] - self.d_j[j]
+            
+    #         problem.setObjective(lpSum([T_j[j] for j in self.JSet]))
+            
+    #         if time() - StartTime > self.maxtime/3:
+    #             raise TimeoutException("Time limit exceeded")
+            
+    #         solver = PULP_CBC_CMD(timeLimit=self.maxtime - (time() - StartTime))
+    #         problem.solve(solver)
 
-    #     print(LpStatus[problem.status])
-    #     if LpStatus[problem.status] != "Optimal":
-    #         print("punishment")
+    #         print(LpStatus[problem.status])
+    #         if LpStatus[problem.status] != "Optimal" or time() - StartTime > self.maxtime:
+    #             print(time() - StartTime, self.maxtime)
+    #             raise TimeoutException("Time limit exceeded")
+    #         else:
+    #             # Retrieve the objective value
+    #             objective_value = value(problem.objective)
+
+    #             X_values  = [[[value(X_ijk[i][j][k]) for k in range(self.K)] for j in range(self.J)] for i in range(self.I)]
+    #             S_values  = [[value(S_ij[i][j]) for j in range(self.J)] for i in range(self.I)]
+    #             C_values  = np.array([[value(C_ij[i][j]) for j in range(self.J)] for i in range(self.I)])
+
+    #             X_values  = np.array(X_values)
+    #             S_values  = np.array(S_values)
+    #             C_values  = np.array(C_values)
+
+    #     except TimeoutException:
+    #         print("punishment", time())
     #         objective_value, X_values, S_values, C_values, Cj_values = self.CDR4()
-    #         objective_value = 10**9 # Punishment
-    #     else:
-    #         print("yayyy")
+    #         objective_value = 10**10  # Punishment
+
+    #     return objective_value, X_values, S_values, C_values, Cj_values
+   
+
+    # def exact(self):
+    #     import threading
+    #     import warnings
+
+    #     class TimeoutException(Exception):
+    #         pass
+        
+    #     self.d_j = self.d_j.astype(int)
+    #     self.n_j = self.n_j.astype(int)
+    #     self.S_k = self.S_k.astype(int)
+    #     self.S_j = self.S_j.astype(int)
+    #     self.p_ijk = self.p_ijk.astype(int)
+
+    #     warnings.filterwarnings('ignore', 'Spaces are not permitted in the name')
+        
+    #     StartTime = time()
+        
+    #     M = 10000
+    #     timeout_event = threading.Event()
+    #     problem = LpProblem("Flexible Job Shop Problem", LpMinimize)
+    #     def interruptable_work(problem):
+    #         nonlocal timeout_event
+    #         global X_ijk, Y_ijab, S_ij, C_ij, C_j, T_j
+    #         try:
+    #             # Decision variables
+    #             X_ijk = [[[LpVariable(f"X_{i}_{j}_{k}", cat='Binary') for k in range(self.K)] for j in range(self.J)] for i in range(self.I)]
+    #             Y_ijab = [[[[LpVariable(f"Y_{i}_{j}_{a}_{b}", cat='Binary') for b in range(self.J)] for a in range(self.I)] for j in range(self.J)] for i in range(self.I)]
+    #             if time() - StartTime > self.maxtime:
+    #                 print(True)
+    #                 timeout_event.set()
+    #                 return
+    #             S_ij = [[LpVariable(f"S_{i}_{j}", lowBound=0, cat='Integer') for j in range(self.J)] for i in range(self.I)]
+    #             C_ij = [[LpVariable(f"C_{i}_{j}", lowBound=0, cat='Integer') for j in range(self.J)] for i in range(self.I)]
+    #             C_j = [LpVariable(f"C_{j}", lowBound=0, cat='Integer') for j in range(self.J)]
+    #             T_j = [LpVariable(f"T_{j}", lowBound=0, cat='Integer') for j in range(self.J)]
+
+    #             # Model constraints
+    #             for j in self.JSet:
+    #                 if time() - StartTime > self.maxtime:
+    #                     print(True)
+    #                     timeout_event.set()
+    #                     return
+    #                 for i in self.OJSet[j]:                          
+    #                     problem += lpSum(X_ijk[i][j][k] for k in range(self.K)) == 1
+    #                     for k in range(self.K):
+    #                         problem += X_ijk[i][j][k] <= self.h_ijk[i, j, k]
+    #                     problem += -S_ij[i][j] + lpSum(X_ijk[i][j][k] * self.S_k[k] for k in self.MC_ji[j][i]) <= 0
+    #                     problem += -S_ij[i][j] <= -self.S_j[j]
+
+    #                     if i != self.n_j[j] - 1:
+    #                         problem += S_ij[i][j] + lpSum(X_ijk[i][j][k] * self.p_ijk[i, j, k] for k in self.MC_ji[j][i]) - S_ij[i+1][j] <= 0
+
+    #                     for b in self.JSet:
+    #                         if j < b:
+    #                             for a in self.OJSet[b]:
+    #                                 MC_common = set(self.MC_ji[j][i]).intersection(set(self.MC_ji[b][a]))
+    #                                 for k in MC_common:
+    #                                     problem += - S_ij[i][j] + S_ij[a][b] - M * (2 - X_ijk[i][j][k] - X_ijk[a][b][k] + Y_ijab[i][j][a][b]) <=  -self.p_ijk[a, b, k]
+    #                                     problem += - S_ij[a][b] + S_ij[i][j] - M * (3 - X_ijk[i][j][k] - X_ijk[a][b][k] - Y_ijab[i][j][a][b]) <=  -self.p_ijk[i, j, k] 
+    #                     problem += C_ij[i][j] == S_ij[i][j] + lpSum(X_ijk[i][j][k] * self.p_ijk[i, j, k] for k in self.MC_ji[j][i])
+    #                 problem += C_j[j] - C_ij[int(self.n_j[j]-1)][j] == 0
+    #                 problem += C_j[j] - T_j[j] <= self.d_j[j]
+
+    #         except Exception as e:
+    #             timeout_event.set()
+    #             raise e
+
+    #     try:
+    #         # Start the thread
+    #         worker_thread = threading.Thread(target=interruptable_work(problem))
+    #         worker_thread.start()
+
+    #         # Wait for the worker thread with a timeout
+    #         worker_thread.join(timeout=self.maxtime)
+    #         if worker_thread.is_alive():
+    #             timeout_event.set()
+    #         if timeout_event.is_set():
+    #             raise TimeoutException("Time limit exceeded for variable creation and constraints setting")
+
+    #         # Set objective
+    #         problem.setObjective(lpSum([T_j[j] for j in self.JSet]))
+
+    #         # Calculate remaining time for solving
+    #         remaining_time = self.maxtime - (time() - StartTime)
+    #         if remaining_time <= 0:
+    #             raise TimeoutException("Time limit exceeded before solving")
+
+    #         # Start a timer for solving the problem
+    #         solver_timer = threading.Timer(remaining_time, lambda: timeout_event.set())
+    #         solver_timer.start()
+
+    #         # Solve the problem
+    #         solver = PULP_CBC_CMD(msg=False, options=['sec', str(remaining_time)])
+    #         problem.solve(solver)
+
+    #         # Cancel the solver timer if solving is completed in time
+    #         solver_timer.cancel()
+
+    #         print(LpStatus[problem.status])
+    #         # Check the result
+    #         if LpStatus[problem.status] != "Optimal" or time() - StartTime > self.maxtime:
+    #             raise TimeoutException("Time limit exceeded or problem not optimal")
+
     #         # Retrieve the objective value
     #         objective_value = value(problem.objective)
 
-    #         X_values  = [[[value(X_ijk[i][j][k]) for k in range(self.K)] for j in range(self.J)] for i in range(self.I)]
-    #         S_values  = [[value(S_ij[i][j]) for j in range(self.J)] for i in range(self.I)]
-    #         C_values  = np.array([[value(C_ij[i][j]) for j in range(self.J)] for i in range(self.I)])
+    #         X_values = np.array([[[value(X_ijk[i][j][k]) for k in range(self.K)] for j in range(self.J)] for i in range(self.I)])
+    #         S_values = np.array([[value(S_ij[i][j]) for j in range(self.J)] for i in range(self.I)])
+    #         C_values = np.array([[value(C_ij[i][j]) for j in range(self.J)] for i in range(self.I)])
 
-    #         X_values  = np.array(X_values)
-    #         S_values  = np.array(S_values)
-    #         C_values  = np.array(C_values)
+    #         Cj_values = np.max(C_values, axis=0)
 
-    #         X_values[X_values == None] = 0.0
-    #         S_values[S_values == None] = -999
-    #         C_values[C_values == None] = -999
-
-    #         Cj_values = np.max(C_values, axis = 0)
+    #     except TimeoutException as e:
+    #         print(str(e))
+    #         print("punishment")
+    #         objective_value, X_values, S_values, C_values, Cj_values = self.CDR4()
+    #         objective_value = 10**10  # Punishment
+    #     except Exception as e:
+    #         print("Error:", str(e))
 
     #     return objective_value, X_values, S_values, C_values, Cj_values
-
-    def exact(self):
-        from ortools.sat.python import cp_model
-        model = cp_model.CpModel()
-        M = 10000
-        self.S_k = self.S_k.astype(int)
-        self.S_j = self.S_j.astype(int)
-        # Decision variables
-        X_ijk = [[[model.NewBoolVar(f'X_{i}_{j}_{k}') for k in range(self.K)] for j in range(self.J)] for i in range(self.I)]
-        Y_ijab = [[[[model.NewBoolVar(f'Y_{i}_{j}_{a}_{b}') for b in range(self.J)] for a in range(self.I)] for j in range(self.J)] for i in range(self.I)]
-
-        S_ij = [[model.NewIntVar(0, M, f'S_{i}_{j}') for j in range(self.J)] for i in range(self.I)]
-        C_ij = [[model.NewIntVar(0, M, f'C_{i}_{j}') for j in range(self.J)] for i in range(self.I)]
-        C_j = [model.NewIntVar(0, M, f'C_{j}') for j in range(self.J)]
-        T_j = [model.NewIntVar(0, M, f'T_{j}') for j in range(self.J)]
-
-        # Constraints
-        for j in self.JSet:
-            for i in self.OJSet[j]:
-                model.Add(sum(X_ijk[i][j][k] for k in self.MC_ji[j][i]) == 1)
-                model.Add(S_ij[i][j] >= sum(X_ijk[i][j][k] * self.S_k[k] for k in self.MC_ji[j][i]))
-                model.Add(S_ij[i][j] >= self.S_j[j])
-
-                if i != int(self.n_j[j]) - 1:
-                    model.Add(S_ij[i][j] + sum(X_ijk[i][j][k] * self.p_ijk[i, j, k] for k in self.MC_ji[j][i]) <= S_ij[i + 1][j])
-
-                for b in self.JSet:
-                    for a in self.OJSet[b]:
-                        if j < b:
-                            MC_common = set(self.MC_ji[j][i]).intersection(set(self.MC_ji[b][a]))
-                            for k in MC_common:
-                                model.Add(S_ij[i][j] >= S_ij[a][b] + self.p_ijk[a, b, k] - M * (2 - X_ijk[i][j][k] - X_ijk[a][b][k] + Y_ijab[i][j][a][b]))
-                                model.Add(S_ij[a][b] >= S_ij[i][j] + self.p_ijk[i, j, k] - M * (3 - X_ijk[i][j][k] - X_ijk[a][b][k] - Y_ijab[i][j][a][b]))
-
-                model.Add(C_ij[i][j] == S_ij[i][j] + sum(X_ijk[i][j][k] * self.p_ijk[i, j, k] for k in self.MC_ji[j][i]))
-            model.Add(C_j[j] == C_ij[int(self.n_j[j]) - 1][j])
-            model.Add(T_j[j] >= C_j[j] - self.d_j[j])
-
-        # Objective function
-        model.Minimize(sum(T_j[j] for j in self.JSet))
-
-        # Set a time limit of 10 seconds
-        solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = 10
-        solver.parameters.log_search_progress = True
-
-        with open('solver_log.txt', 'w') as f:
-            solver.parameters.log_search_progress = True
-            sys.stdout = f
-            sys.stderr = f
-            status = solver.Solve(model)
-            sys.stdout = sys.__stdout__
-            sys.stderr = sys.__stderr__
-
-        # Solve the problem
-        status = solver.Solve(model)
-
-        if status != cp_model.OPTIMAL:
-            print("punishment")
-            objective_value, X_values, S_values, C_values, Cj_values = self.CDR4()
-            objective_value = 10**9  # Punishment
-        else:
-            print("yayyy")
-            # Retrieve the objective value
-            objective_value = solver.ObjectiveValue()
-
-            X_values = [[[solver.BooleanValue(X_ijk[i][j][k]) for k in range(self.K)] for j in range(self.J)] for i in range(self.I)]
-            S_values = [[solver.Value(S_ij[i][j]) for j in range(self.J)] for i in range(self.I)]
-            C_values = np.array([[solver.Value(C_ij[i][j]) for j in range(self.J)] for i in range(self.I)])
-
-            X_values = np.array(X_values)
-            S_values = np.array(S_values)
-            C_values = np.array(C_values)
-
-            X_values[X_values == None] = 0.0
-            S_values[S_values == None] = -999
-            C_values[C_values == None] = -999
-
-            Cj_values = np.max(C_values, axis=0)
-
-        return objective_value, X_values, S_values, C_values, Cj_values
-
 
     def GA(self):
         StartTime                     = time()
@@ -254,7 +293,7 @@ class Method:
                                                         self.PopSize, population, chromosome_len,
                                                         StartTime, self.maxtime)
         return GBest, X_ijk, S_ij, C_ij, C_j
-
+    
     def TS(self):
         StartTime              = time()
         OA, MS, chromosome_len = encode_schedule(self.J, self.I, self.n_j, self.X_ijk, self.S_ij, 
@@ -270,12 +309,12 @@ class Method:
                 else:
                     OA = OA + [job]*self.n_j[job]
                     MS = MS + random_numbers
-        print("check OA", OA)
+
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
                                                     self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, self.MC_ji, self.n_MC_ji, 
                                                     OA, MS, chromosome_len, StartTime, self.maxtime)
         return GBest, X_ijk, S_ij, C_ij, C_j
-
+    
 
     def LFOH (self):
         ORSet            = []
@@ -291,14 +330,14 @@ class Method:
         Reschedule_completion = False
         # Start
         for j in dummy_JSet:
-            ready_time = S_j[j]
-            operation  = [dummy_OJSet[j][0], j]
+            ready_time = copy.deepcopy(S_j[j])
+            operation  = copy.deepcopy([dummy_OJSet[j][0], j])
             if ready_time not in ORDict:
                 ORDict[ready_time] = []
             ORDict[ready_time].append(operation)
 
         ready_time       = min(ORDict)
-        ORSet            = ORDict[ready_time]
+        ORSet            = copy.deepcopy(ORDict[ready_time])
         sorted_operation = sorted(ORSet, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0], x[1]])))
 
 
@@ -309,10 +348,13 @@ class Method:
                     k = self.MC_ji[j][i]
                     X_ijk[i, j, k] = 1
                 else:
-                    mask            = np.multiply(self.p_ijk[i, j], self.h_ijk[i, j])
-                    mask[mask==0]   = 999**3
-                    sum_values      = mask + np.maximum(ready_time, S_k)
-                    k               = np.argmin(sum_values)
+                    available           = np.maximum(ready_time, S_k)
+                    mask                = self.h_ijk[i, j, :] == 1
+                    filtered_available  = available[mask]
+                    min_value           = np.min(filtered_available)
+                    min_indices         = np.where(filtered_available == min_value)[0]
+                    filtered_index      = np.random.choice(min_indices)
+                    k                   = np.arange(len(available))[mask][filtered_index]
                     X_ijk[i, j, k]  = 1  
                 # Calculate Start time, Completion time, and set new S_k
                 S_ij[i, j]          = max(ready_time, S_k[k])
@@ -322,7 +364,7 @@ class Method:
                 dummy_OJSet[j].remove(i)
                 if len(dummy_OJSet[j]) != 0:
                     new_ready_time = copy.deepcopy(C_ij[i, j])
-                    operation      = [dummy_OJSet[j][0], j]
+                    operation      = copy.deepcopy([dummy_OJSet[j][0], j])
                     if new_ready_time not in ORDict:
                         ORDict[new_ready_time] = []
                     ORDict[new_ready_time].append(operation)
@@ -332,7 +374,7 @@ class Method:
             ORDict.pop(ready_time)
             if ORDict:
                 ready_time       = min(ORDict)
-                ORSet            = ORDict[ready_time]
+                ORSet            = copy.deepcopy(ORDict[ready_time])
                 sorted_operation = sorted(ORSet, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0], x[1]])))
             else: Reschedule_completion = True
 
@@ -355,14 +397,14 @@ class Method:
         Reschedule_completion = False
         # Start
         for j in dummy_JSet:
-            ready_time = self.S_j[j]
-            operation  = [dummy_OJSet[j][0], j]
+            ready_time = copy.deepcopy(self.S_j[j])
+            operation  = copy.deepcopy([dummy_OJSet[j][0], j])
             if ready_time not in ORDict:
                 ORDict[ready_time] = []
             ORDict[ready_time].append(operation)
 
         ready_time = min(ORDict)
-        ORSet      = ORDict[ready_time]
+        ORSet      = copy.deepcopy(ORDict[ready_time])
 
         while Reschedule_completion == False:
             # Initialize cost matrix with a high value
@@ -392,7 +434,7 @@ class Method:
                 
                 if len(dummy_OJSet[j]) != 0:
                     new_ready_time = copy.deepcopy(C_ij[i, j])
-                    operation      = [dummy_OJSet[j][0], j]
+                    operation      = copy.deepcopy([dummy_OJSet[j][0], j])
                     if new_ready_time not in ORDict:
                         ORDict[new_ready_time] = []
                     ORDict[new_ready_time].append(operation)
@@ -404,7 +446,7 @@ class Method:
 
             if unassigned_operations:
                 new_ready_time = min(new_availabletime) ####
-                if new_ready_time in ORDict.keys():
+                if new_ready_time in ORDict:
                     ORDict[new_ready_time].extend(unassigned_operations)
                 else:
                     ORDict[new_ready_time] = unassigned_operations
@@ -412,7 +454,7 @@ class Method:
             # Process the dictionary, check flag
             if ORDict:
                 ready_time   = min(ORDict)
-                ORSet        = ORDict[ready_time]
+                ORSet        = copy.deepcopy(ORDict[ready_time])
                
             else: Reschedule_completion = True
 
@@ -436,14 +478,14 @@ class Method:
  
         # Start
         for j in dummy_JSet:
-            ready_time = S_j[j]
-            operation  = [dummy_OJSet[j][0], j]
+            ready_time = copy.deepcopy(S_j[j])
+            operation  = copy.deepcopy([dummy_OJSet[j][0], j])
             if ready_time not in ORDict:
                 ORDict[ready_time] = []
             ORDict[ready_time].append(operation)
 
         ready_time = min(ORDict)
-        ORSet      = ORDict[ready_time]
+        ORSet      = copy.deepcopy(ORDict[ready_time])
 
         while Reschedule_completion == False:
             # Initialize cost matrix with a high value
@@ -469,8 +511,8 @@ class Method:
                 S_k[k]              = copy.deepcopy(C_ij[i, j])
                 dummy_OJSet[j].remove(i) 
                 if len(dummy_OJSet[j]) != 0:
-                    new_ready_time = C_ij[i][j]
-                    operation      = [dummy_OJSet[j][0], j]
+                    new_ready_time = copy.deepcopy(C_ij[i][j])
+                    operation      = copy.deepcopy([dummy_OJSet[j][0], j])
                     if new_ready_time not in ORDict:
                         ORDict[new_ready_time] = []
                     ORDict[new_ready_time].append(operation)
@@ -488,10 +530,13 @@ class Method:
                         k = self.MC_ji[j][i]
                         X_ijk[i, j, k]  = 1
                     else:
-                        mask            = np.multiply(self.p_ijk[i, j], self.h_ijk[i, j])
-                        mask[mask==0]   = 999**3
-                        sum_values      = mask + np.maximum(ready_time, S_k[k])
-                        k               = np.argmin(sum_values)
+                        available           = np.maximum(ready_time, S_k)
+                        mask                = self.h_ijk[i, j, :] == 1
+                        filtered_available  = available[mask]
+                        min_value           = np.min(filtered_available)
+                        min_indices         = np.where(filtered_available == min_value)[0]
+                        filtered_index      = np.random.choice(min_indices)
+                        k                   = np.arange(len(available))[mask][filtered_index]
                         X_ijk[i, j, k]  = 1  
                     # Calculate Start time, Completion time, and set new S_k
                     S_ij[i, j]          = max(ready_time, S_k[k])
@@ -501,7 +546,7 @@ class Method:
                     dummy_OJSet[j].remove(i)
                     if len(dummy_OJSet[j]) != 0:
                         new_ready_time = copy.deepcopy(C_ij[i, j])
-                        operation      = [dummy_OJSet[j][0], j]
+                        operation      = copy.deepcopy([dummy_OJSet[j][0], j])
                         if new_ready_time not in ORDict:
                             ORDict[new_ready_time] = []
                         ORDict[new_ready_time].append(operation)
@@ -511,7 +556,7 @@ class Method:
             # Process the dictionary, check flag
             if ORDict:
                 ready_time   = min(ORDict)
-                ORSet        = ORDict[ready_time]
+                ORSet        = copy.deepcopy(ORDict[ready_time])
             else: Reschedule_completion = True
 
         # Calculate GBest
@@ -582,7 +627,7 @@ class Method:
         p_mean           = np.mean(self.p_ijk*self.h_ijk, axis= 2)
         dummy_JSet       = copy.deepcopy(self.JSet)
         Reschedule_completion = False
-        
+
         while Reschedule_completion == False:
             # Check if there is Tard_job
             if self.Tard_job:
@@ -601,7 +646,9 @@ class Method:
             available           = np.maximum(self.S_j[j], self.S_k)
             mask                = self.h_ijk[i, j, :] == 1
             filtered_available  = available[mask]
-            filtered_index      = np.argmin(filtered_available)
+            min_value           = np.min(filtered_available)
+            min_indices         = np.where(filtered_available == min_value)[0]
+            filtered_index      = np.random.choice(min_indices)
             k                   = np.arange(len(available))[mask][filtered_index]
             X_ijk[i, j, k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
@@ -654,7 +701,9 @@ class Method:
             available           = np.maximum(self.S_j[j], self.S_k)
             mask                = self.h_ijk[i, j, :] == 1
             filtered_available  = available[mask]
-            filtered_index      = np.argmin(filtered_available)
+            min_value           = np.min(filtered_available)
+            min_indices         = np.where(filtered_available == min_value)[0]
+            filtered_index      = np.random.choice(min_indices)
             k                   = np.arange(len(available))[mask][filtered_index]
             X_ijk[i, j, k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
@@ -682,8 +731,8 @@ class Method:
     
     def CDR3(self):
         for j in self.JSet:
-            for i in self.OJSet[j]:
-                self.X_ijk[i, j].fill(0)
+            self.X_ijk[self.OJSet[j], j, :] = 0
+
         S_ij             = np.zeros((self.I, self.J))
         C_ij             = np.zeros((self.I, self.J))
         p_mean           = np.mean(self.p_ijk*self.h_ijk, axis= 2)
@@ -705,10 +754,19 @@ class Method:
                 workload[k] = np.sum(self.p_ijk[ope, job, k] * self.X_ijk[ope, job, k] for job in range(self.J) for ope in range(int(self.n_j[job] - self.n_ops_left_j[job])) )
             utilization = workload / self.T_cur
 
-            if r < 0.5:
-                k = np.argmin(utilization)
+            mask = self.h_ijk[i, j, :] == 1
+            if r < 0.5:           
+                filtered_available  = utilization[mask]
+                min_value           = np.min(filtered_available)
+                min_indices         = np.where(filtered_available == min_value)[0]
+                filtered_index      = np.random.choice(min_indices)
+                k                   = np.arange(len(utilization))[mask][filtered_index]
             else:
-                k = np.argmin(workload)   
+                filtered_available  = workload[mask]
+                min_value           = np.min(filtered_available)
+                min_indices         = np.where(filtered_available == min_value)[0]
+                filtered_index      = np.random.choice(min_indices)
+                k                   = np.arange(len(workload))[mask][filtered_index]
             self.X_ijk[i, j, k] = 1  
             # Calculate Start time, Completion time, and set new S_k
             S_ij[i, j]          = max(self.S_j[j], self.S_k[k])
@@ -749,7 +807,9 @@ class Method:
             available           = np.maximum(self.S_j[j], self.S_k)
             mask                = self.h_ijk[i, j, :] == 1
             filtered_available  = available[mask]
-            filtered_index      = np.argmin(filtered_available)
+            min_value           = np.min(filtered_available)
+            min_indices         = np.where(filtered_available == min_value)[0]
+            filtered_index      = np.random.choice(min_indices)
             k                   = np.arange(len(available))[mask][filtered_index]
             X_ijk[i, j, k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
@@ -798,7 +858,9 @@ class Method:
             available           = np.maximum(self.S_j[j], self.S_k)
             mask                = self.h_ijk[i, j, :] == 1
             filtered_available  = available[mask]
-            filtered_index      = np.argmin(filtered_available)
+            min_value           = np.min(filtered_available)
+            min_indices         = np.where(filtered_available == min_value)[0]
+            filtered_index      = np.random.choice(min_indices)
             k                   = np.arange(len(available))[mask][filtered_index]
             X_ijk[i, j, k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
@@ -845,8 +907,9 @@ class Method:
             available           = np.maximum(self.S_j[j], self.S_k)
             mask                = self.h_ijk[i, j, :] == 1
             filtered_available  = available[mask]
-            
-            filtered_index      = np.argmin(filtered_available)
+            min_value           = np.min(filtered_available)
+            min_indices         = np.where(filtered_available == min_value)[0]
+            filtered_index      = np.random.choice(min_indices)
             k                   = np.arange(len(available))[mask][filtered_index]
             X_ijk[i, j, k]      = 1  
             # Calculate Start time, Completion time, and set new S_k
@@ -877,8 +940,23 @@ class Method:
         Job_seq = copy.deepcopy(self.OJSet)
         Mch_seq = find_Mch_seq(self.K, self.X_ijk, self.C_ij, self.t)
 
-        for breakdown_MC in self.affected_Oij.keys():
-            for Oij in reversed(self.affected_Oij[breakdown_MC]):
+        affected_Oij = {}
+        for k in self.MBList:
+            X_mask =  self.X_ijk.astype(bool)
+            self.re[k]  =  self.t
+            """Find affected operation"""
+            # Use the boolean mask to find the indices where overlap occurs
+            overlap_mask = np.logical_or(
+                np.logical_and(self.S_ij >= self.t              , self.C_ij <= self.t + self.re[k]),       # in
+                np.logical_and(self.S_ij <= self.t              , self.C_ij >  self.t             ),       # left
+                np.logical_and(self.S_ij <  self.t + self.re[k] , self.C_ij >= self.t + self.re[k]))       # right
+            indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :])
+            # Append the indices to the affected_Oij dictionary
+            if len(indices) > 0:
+                affected_Oij[k] = indices.tolist()
+
+        for breakdown_MC in affected_Oij:
+            for Oij in reversed(affected_Oij[breakdown_MC]):
                 X_mask    =  self.X_ijk.astype(bool)
                 S_ij_mask =  self.S_ij >= self.t
 
@@ -935,7 +1013,7 @@ class Method:
                     id_ope_onMCh     = Mch_seq[breakdown_MC].index(Oij)
 
                     X_RightShift, S_RightShift, C_RightShift = RightShift(breakdown_MC, id_ope_onMCh, self.S_k[breakdown_MC], Job_seq, Mch_seq, self.X_ijk, self.S_ij, self.C_ij, self.p_ijk, self.n_j)
-                    cost_RightShift = evaluate_LocalCost(self.d_j, C_RightShift, self.JSet)
+                    cost_RightShift, redundant = evaluate_LocalCost(self.d_j, C_RightShift, self.JSet)
 
                     X_modified      .append(X_RightShift)
                     S_modified      .append(S_RightShift)
@@ -959,7 +1037,7 @@ class Method:
 
                     ## Right-Shift
                     X_RCRS, S_RCRS, C_RCRS = RightShift(breakdown_MC, id_ope_onMCh, self.S_k[new_k], Job_seq, Mch_seq, dummy_X_ijk, self.S_ij, self.C_ij, self.p_ijk, self.n_j)
-                    cost_RCRS = evaluate_LocalCost(self.d_j, C_RCRS, self.JSet)
+                    cost_RCRS, redundant = evaluate_LocalCost(self.d_j, C_RCRS, self.JSet)
 
                     X_modified      .append(X_RCRS)
                     S_modified      .append(S_RCRS)
@@ -995,7 +1073,7 @@ class Method:
                             dummy_X_ijk[i, j, new_k] = 1
                             dummy_S_ij[i, j] = copy.deepcopy(S_Oij)
                             dummy_C_ij[i, j] = copy.deepcopy(C_Oij)
-                            cost_LastPos = evaluate_LocalCost(self.d_j, dummy_C_ij, self.JSet)
+                            cost_LastPos, redundant = evaluate_LocalCost(self.d_j, dummy_C_ij, self.JSet)
                             
                             dummy_Mch_seq[breakdown_MC].remove(Oij)
                             dummy_Mch_seq[new_k]       .append(Oij)
@@ -1022,7 +1100,9 @@ class Method:
                     mask                = self.h_ijk[i, j, :] == 1
                     filtered_available  = available[mask]
                     
-                    filtered_index      = np.argmin(filtered_available)
+                    min_value           = np.min(filtered_available)
+                    min_indices         = np.where(filtered_available == min_value)[0]
+                    filtered_index      = np.random.choice(min_indices)
                     k                   = np.arange(len(available))[mask][filtered_index]
                     self.X_ijk[i, j, k] = 1  
                     # Calculate Start time, Completion time, and set new S_k

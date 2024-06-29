@@ -117,90 +117,99 @@ def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record
     have_event      = False
     for job, deadline, description in JA_event:
         have_event  = True
-        time_occur  = np.max(C_ij[:,job])
-        if time_occur > t:
-            if time_occur not in events:
-                events[time_occur] = []
-            events[time_occur].append(("JA", job, deadline, description))
+        time_occur  = copy.deepcopy(C_j[job])
+        if time_occur not in events:
+            events[time_occur] = []
+        events[time_occur].append(("JA", job, deadline, description))
 
     for k in range(K):
         if MB_event[k]:
             have_event  = True
             time_occur, repair, description = MB_event[k][0]
-            if time_occur > t:
-                if time_occur not in events:
-                    events[time_occur] = []
-                events[time_occur].append(("MB", k, repair, description))
+            if time_occur not in events:
+                events[time_occur] = []
+            events[time_occur].append(("MB", k, repair, description))
     
     re            = np.zeros((K)) 
     if have_event == True:
         found         = None
         while found == None:
-            affected_Oij    = {}
-            new_time        = copy.deepcopy(int(min(events.keys())))
-            triggered_event = events[new_time]
-            need_modify     = 0
-            for uncertain_type, k, time_event, description in triggered_event:
-                if uncertain_type == "MB":
-                    X_mask =  X_ijk.astype(bool)
-                    re[k]  =  time_event
-                    """Find affected operation"""
-                    # Use the boolean mask to find the indices where overlap occurs
-                    overlap_mask = np.logical_or(
-                        np.logical_and(S_ij >= new_time        , C_ij <= new_time + re[k]),       # in
-                        np.logical_and(S_ij <= new_time        , C_ij >  new_time        ),       # left
-                        np.logical_and(S_ij <  new_time + re[k], C_ij >= new_time + re[k]))       # right
-                    indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :])
-                    # Append the indices to the affected_Oij dictionary
-                    if len(indices) > 0:
-                        adjusted_indices = [[i+ 1, j] for i, j in indices] # Due to segmentize the operation
-                        affected_Oij[k] = adjusted_indices
-                    if k not in affected_Oij:
-                        event = (uncertain_type, k, time_event, description)
-                        # Remove current time
-                        events[new_time].remove(event)
-                        if not events[new_time]:
-                            events.pop(new_time)
-                        # Adjust to new time (shift_time)
-                        mask          = np.logical_and(S_ij > new_time, X_ijk[:, :, k] == 1)
-                        filtered_S_ij = S_ij[mask]
-                        if filtered_S_ij.size > 0:
-                            shift_time    = np.min(filtered_S_ij)
-                            if shift_time not in events:
-                                events[shift_time] = []
-                            events[shift_time].append(event)
-                            # Adjust var
-                            need_modify += 1
-                        else:
-                            MB_event[k].pop(0)
-            if need_modify == 0:
-                found = True
-
-        for uncertain_type, partID, time_event, description in triggered_event:
-            if uncertain_type == "JA":
-                JA_event = [JA for JA in JA_event if JA[0] != partID]
-            else:
-                if partID not in MB_record:
-                    MB_record[partID] = []
-                record = (new_time, new_time+re[partID])
-                MB_record[partID].append(record)
-                MB_event[partID].pop(0)
-        for key, value in events.items():
-            if key < new_time:
-                new_key = new_time + 60
-                if new_key in new_data:
-                    events[new_key].extend(value)
+            if events:
+                affected_Oij    = {}
+                new_t           = copy.deepcopy(int(min(events.keys())))
+                triggered_event = copy.deepcopy(events[new_t])
+                if new_t <= t:
+                    new_time = t+300
                 else:
-                    events[new_key] = value
-        if not triggered_event:
+                    new_time = copy.deepcopy(new_t)
+                need_modify     = 0
+                for uncertain_type, k, time_event, description in triggered_event:
+                    if uncertain_type == "MB":
+                        X_mask =  X_ijk.astype(bool)
+                        re[k]  =  time_event
+                        """Find affected operation"""
+                        # Use the boolean mask to find the indices where overlap occurs
+                        overlap_mask = np.logical_or(
+                            np.logical_and(S_ij >= new_time        , C_ij <= new_time + re[k]),       # in
+                            np.logical_and(S_ij <= new_time        , C_ij >  new_time        ),       # left
+                            np.logical_and(S_ij <  new_time + re[k], C_ij >= new_time + re[k]))       # right
+                        indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :])
+                        # Append the indices to the affected_Oij dictionary
+                        if len(indices) > 0:
+                            # adjusted_indices = [[i, j] for i, j in indices] # Due to segmentize the operation
+                            affected_Oij[k] = indices.tolist()
+                        if k not in affected_Oij:
+                            event = (uncertain_type, k, time_event, description)
+                            # Remove current time
+                            events[new_t].remove(event)
+                            if len (events[new_t]) == 0:
+                                events.pop(new_t)
+                            # Adjust to new time (shift_time)
+                            mask          = np.logical_and(S_ij > new_time, X_ijk[:, :, k] == 1)
+                            filtered_S_ij = S_ij[mask]
+
+                            if filtered_S_ij.size > 0:
+                                shift_time    = np.min(filtered_S_ij)
+                                if shift_time not in events:
+                                    events[shift_time] = []
+                                events[shift_time].append(event)
+
+                            need_modify += 1
+                        
+                if need_modify == 0:
+                    found = True
+            else:
+                break
+
+        if events: # After While loop, If have events
+            for uncertain_type, partID, time_event, description in triggered_event:
+                if uncertain_type == "JA":
+                    JA_event = [JA for JA in JA_event if JA[0] != partID]
+                else:
+                    if partID not in MB_record:
+                        MB_record[partID] = []
+                    record = (new_time, new_time+re[partID])
+                    MB_record[partID].append(record)
+                    MB_event[partID].pop(0)
+            # for key, value in events.items():
+            #     if key < new_time:
+            #         new_key = new_time + 60
+            #         if new_key in new_data:
+            #             events[new_key].extend(value)
+            #         else:
+            #             events[new_key] = value
+            if not triggered_event:
+                new_time = np.max(C_j)
+                triggered_event = None     
+        else:
             new_time = np.max(C_j)
-            triggered_event = None     
+            triggered_event = None 
+
     else:
         new_time = np.max(C_j)
         triggered_event = None  
-        affected_Oij = {}   
     
-    return JA_event, MB_event, new_time, triggered_event, affected_Oij, re, MB_record
+    return JA_event, MB_event, new_time, triggered_event, re, MB_record
 
     
 def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
@@ -217,6 +226,7 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
     for j in JSet:
         OJSet[j] = np.where(S_ij[:int(n_j[j]), j] >= t)[0].tolist()
 
+
     ## Job and operation has been run
     ES_j  = np.min(S_ij, axis=0)
     DSet  = np.where(ES_j < t)[0].tolist()
@@ -232,6 +242,7 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
     JA_long_boolean     = 0
     MB_critical_boolean = 0
     NewJobList          = []
+    MBList              = []
     if triggered_event is not None:
         for uncertain_type, partID, time_event, description in triggered_event:
             if uncertain_type == "MB": 
@@ -245,7 +256,8 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
             i, j = np.where((X_ijk[:, :, k] == 1) & (S_ij < t) & (C_ij > t))
             if len(i) != 0 and len(j) != 0:
                 operation = (i,j)
-                Oij_on_machine[k].append(operation)
+                # Oij_on_machine[k].append(operation)
+                Oij_on_machine[k] = copy.deepcopy(operation)
 
         # Soonest start time ------------------------------------------------------
         idle     = np.zeros((K)) # boolean, =1 if machine idle at time t, 0 otherwise (busy processing or repair)
@@ -256,28 +268,25 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
             if not MB[k]:
                 operation = Oij_on_machine[k]
                 if len(operation) != 0:
-                    i = copy.deepcopy(operation[0][0][0])
-                    j = copy.deepcopy(operation[0][1][0])
-                    av[k] = C_ij[i][j] - t
+                    i = copy.deepcopy(operation[0][0])
+                    j = copy.deepcopy(operation[1][0])
+                    av[k] = C_ij[i, j] - t
                     bu[k] = 1
                 else:   
                     idle[k] = 1
             else:
+                MBList.append(k)
                 operation = Oij_on_machine[k]
                 if len(operation) != 0:
-                    i = copy.deepcopy(operation[0][0][0])
-                    j = copy.deepcopy(operation[0][1][0])
-                    processed  = t - S_ij[i][j]
+                    i = copy.deepcopy(operation[0][0])
+                    j = copy.deepcopy(operation[1][0])
+                    processed  = t - S_ij[i, j]
                 
                     """Break the operation into  2 segments"""
                     p_ijk, h_ijk, X_ijk, S_ij, C_ij, MC_ji, n_MC_ji, n_j, I, org_p_ijk, org_h_ijk = change_dataset(p_ijk, h_ijk, X_ijk, S_ij, C_ij, MC_ji, n_MC_ji, n_j, j, i, processed, I, K, org_p_ijk, org_h_ijk)
-                    OJSet[j].insert(0, i)                     # need to schedule the remaining of affected operation
-                    OJSet[j]   = [ops+1 for ops in OJSet[j]]  # update OJSet to match with parameters stored in np array
-                    ODSet[j].append(i)
+                    OJSet[j].append(n_j[j]-1)                    
                     if j not in JSet:
                         JSet.append(j)
-                    if j not in DSet:
-                        DSet.append(j)
 
         S_k = np.maximum(t + (1-idle)*(bu*av + (1-bu)*re), S_k)
         
@@ -345,8 +354,8 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                         operation = copy.deepcopy(Oij_on_machine[k])
 
                         if len(operation) != 0:
-                            i = copy.deepcopy(operation[0][0][0])
-                            j = copy.deepcopy(operation[0][1][0])
+                            i = copy.deepcopy(operation[0][0])
+                            j = copy.deepcopy(operation[1][0])
 
                             # Calculate LC of the operation
                             mean_p = np.mean(p_ijk[:, j, :], axis=1)
@@ -360,19 +369,15 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                         k           = copy.deepcopy(Considered_list[k_min_index])
                         if Oij_on_machine[k]:
                             operation  = copy.deepcopy(Oij_on_machine[k]) 
-                            i, j       = copy.deepcopy(operation)
-                            processed  = t - S_ij[i][j]
+                            i = copy.deepcopy(operation[0][0])
+                            j = copy.deepcopy(operation[1][0])
+                            processed  = t - S_ij[i, j]
 
                             """Break the operation into  2 segments"""
                             p_ijk, h_ijk, X_ijk, S_ij, C_ij, MC_ji, n_MC_ji, n_j, I, org_p_ijk, org_h_ijk = change_dataset(p_ijk, h_ijk, X_ijk, S_ij, C_ij, MC_ji, n_MC_ji, n_j, j, i, processed, I, K, org_p_ijk, org_h_ijk)
-                            OJSet[j]   = [ops+1 for ops in OJSet[j]]  # update OJSet to match with parameters stored in np array
-                            OJSet[j].insert(0, i)                     # need to schedule the remaining of affected operation
-                            ODSet[j].append(i)
+                            OJSet[j].append(n_j[j]-1)                    # need to schedule the remaining of affected operation
                             if j not in JSet:
                                 JSet.append(j)
-                            if j not in DSet:
-                                DSet.append(j)
-    
     S_j = np.zeros((J))
     if triggered_event is not None:
         for j in JSet:
@@ -405,10 +410,10 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
     return  S_k, S_j, J, I, JSet, OJSet, DSet, ODSet, OperationPool, \
             n_ops_left_j, MC_ji, n_MC_ji, d_j, n_j, p_ijk, h_ijk,    \
             org_p_ijk, org_h_ijk, org_n_j, org_MC_ji, org_n_MC_ji,   \
-            Oij_on_machine, X_ijk, S_ij, C_ij, C_j,                  \
+            X_ijk, S_ij, C_ij, C_j,                                  \
             JA_boolean, JA_long_boolean, JA_urgent_boolean,          \
             MB_boolean, MB_critical_boolean, sum_re,                 \
-            CT_k, T_cur, Tard_job, NewJobList
+            CT_k, T_cur, Tard_job, NewJobList, MBList
 
 
 def store_schedule(X_ijk, S_ij, C_ij):
@@ -418,17 +423,26 @@ def store_schedule(X_ijk, S_ij, C_ij):
     return X_previous, S_previous, C_previous
 
 
-def update_schedule(DSet, ODSet, X_ijk, S_ij, C_ij, X_previous, S_previous, C_previous):
-    for j in DSet:
-        for i in ODSet[j]:
-            X_ijk[i, j] = copy.deepcopy(X_previous[i, j])
-            S_ij [i, j] = copy.deepcopy(S_previous[i, j])
-            C_ij [i, j] = copy.deepcopy(C_previous[i, j])
+def update_schedule(DSet, ODSet, t, X_ijk, S_ij, C_ij, X_previous, S_previous, C_previous):
+    # for j in DSet:
+    #     for i in ODSet[j]:
+    #         X_ijk[i, j] = copy.deepcopy(X_previous[i, j])
+    #         S_ij [i, j] = copy.deepcopy(S_previous[i, j])
+    #         C_ij [i, j] = copy.deepcopy(C_previous[i, j])
+    S_mask = S_ij < t
+    S_mask_expand = S_mask[:, :, np.newaxis]
+    X_ijk = np.where(S_mask_expand, X_previous, X_ijk)
+    S_ij  = np.where(S_mask, S_previous, S_ij)
+    C_ij  = np.where(S_mask, C_previous, C_ij)
     
     C_j = np.max(C_ij, axis=0)
     return X_ijk, S_ij, C_ij, C_j
 
 def generate_random_event (J, K, planning_horizon, WeibullDistribution, critical_machines, ReworkProbability):
+    import ast
+    import math
+    from scipy.stats import weibull_min
+
     JA_event = []
     MB_event = [[] for _ in range(K)]
     # Determine description based on scenario
@@ -476,3 +490,24 @@ def generate_random_event (J, K, planning_horizon, WeibullDistribution, critical
                     MB_event[machine_id - 1].append((t, downtime, description))
     
     return JA_event, MB_event
+
+def generate_JA_event (J, planning_horizon, ReworkProbability):
+    JA_event = {}
+    # Determine description based on scenario
+    description = random.choice(['urgent', 'normal', 'loose'])
+
+    # Set deadline based on description
+    if description == 'urgent':
+        Deadline = np.random.randint(1, 11, size=J)
+    elif description == 'normal':
+        Deadline = np.full(J, planning_horizon)
+    elif description == 'loose':
+        Deadline = np.full(J, 1.5 * planning_horizon)
+
+    # Generate defected jobs with 3% probability
+    defected_jobs_indices = np.where(np.random.uniform(size=J) < ReworkProbability)[0]  
+
+    for job_id in defected_jobs_indices:
+        JA_event[job_id] = (Deadline[job_id],description)
+
+    return JA_event

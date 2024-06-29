@@ -1,0 +1,20 @@
+Defected Jobs
+JobID, Deadline_info, Description
+11        , 10        , urgent    
+16        , 10        , urgent    
+31        , 2         , urgent    
+33        , 10        , urgent    
+42        , 6         , urgent      
+172       , 8         , urgent    
+189       , 6         , urgent    
+256       , 5         , urgent    
+297       , 10        , urgent    
+328       , 5         , urgent    
+346       , 7         , urgent     
+530       , 5         , urgent    
+633       , 4         , urgent    
+637       , 8         , urgent    
+
+MachineBreakdown
+MachineID, BD_time, 	Re_time
+2         12300.0        2220.0         

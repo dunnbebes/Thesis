@@ -100,7 +100,7 @@ def read_scenario (file_path, K, critical_machines):
                 parts = line.split(',')
                 if len(parts) == 3:
                     try:
-                        job_id = int(parts[0].strip())
+                        job_id = int(parts[0].strip())-1
                         deadline_info = int(parts[1].strip())
                         description = parts[2].strip()
                         JA_event.append((job_id, deadline_info, description))

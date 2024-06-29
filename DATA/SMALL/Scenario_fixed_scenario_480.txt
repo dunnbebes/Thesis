@@ -1,19 +1,23 @@
 Defected Jobs
 JobID, Deadline_info, Description
-41        , 1         , urgent    
-99        , 3         , urgent    
-128       , 9         , urgent    
-160       , 1         , urgent    
-175       , 4         , urgent    
-188       , 1         , urgent    
-225       , 2         , urgent    
-288       , 2         , urgent    
-441       , 9         , urgent    
-562       , 5         , urgent    
-634       , 9         , urgent    
+6         , 3         , urgent    
+32        , 3         , urgent    
+45        , 1         , urgent    
+117       , 4         , urgent    
+147       , 3         , urgent    
+190       , 6         , urgent    
+194       , 9         , urgent    
+220       , 1         , urgent    
+228       , 8         , urgent    
+295       , 7         , urgent    
+321       , 7         , urgent    
+343       , 7         , urgent    
+364       , 2         , urgent    
 
 MachineBreakdown
 MachineID, BD_time, 	Re_time
-11        4680.0         840.0          
-11        21480.0        2220.0         
-13        15300.0        3540.0         
+4         21120.0        2280.0         
+10        8220.0         720.0          
+10        34440.0        780.0          
+11        10080.0        1260.0         
+17        34920.0        4140.0         

@@ -85,17 +85,17 @@ def decoding(S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_
         
         C_ij[i, j] = S_ij[i, j] + p_ijk[i, j, k]
 
-    sum_tardiness, C_j = evaluate_LocalCost(d_j, C_ij, JSet)
+    max_tardiness, C_j = evaluate_LocalCost(d_j, C_ij, JSet)
 
-    return sum_tardiness, X_ijk, S_ij, C_ij, C_j
+    return max_tardiness, X_ijk, S_ij, C_ij, C_j
 
 
 def evaluate(population, indices, chromosome_len, fitness, n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j, S_k, S_j):
     for n in indices:
         OA                                    = population[n][0]
         MS                                    = population[n][1]
-        sum_tardiness, X_ijk, S_ij, C_ij, C_j = decoding(S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
-        fitness [n]                           = sum_tardiness
+        max_tardiness, X_ijk, S_ij, C_ij, C_j = decoding(S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
+        fitness [n]                           = max_tardiness
     
     return fitness
 
@@ -127,23 +127,37 @@ def crossover(population, parent_indices, child_indices, crossover_rate, chromos
         parent1                   = population[chosen_parents_indices[0]]
         parent2                   = population[chosen_parents_indices[1]]
 
-        if random.random() <= crossover_rate:
-            offspring1 = parent1[0].copy(), parent1[1].copy()
-            offspring2 = parent2[0].copy(), parent2[1].copy()
-            point = random.randint(1, chromosome_len - 1)
-            # Perform crossover for each chromosome
-            for chromosome in range(2):
-                offspring1[chromosome][:point] = parent1[chromosome][:point].copy()
-                offspring1[chromosome][point:] = parent2[chromosome][point:].copy()
-                offspring2[chromosome][:point] = parent2[chromosome][:point].copy()
-                offspring2[chromosome][point:] = parent1[chromosome][point:].copy()
+        # if random.random() <= crossover_rate:
+        #     offspring1 = parent1[0].copy(), parent1[1].copy()
+        #     offspring2 = parent2[0].copy(), parent2[1].copy()
+        
+        #     # Perform crossover for each chromosome
+        #     for chromosome in range(2):
+        #         point = random.randint(1, chromosome_len - 1)
+        #         offspring1[chromosome][:point] = parent1[chromosome][:point].copy()
+        #         offspring1[chromosome][point:] = parent2[chromosome][point:].copy()
+        #         offspring2[chromosome][:point] = parent2[chromosome][:point].copy()
+        #         offspring2[chromosome][point:] = parent1[chromosome][point:].copy()
 
-            child1_index              = unreplaced_indices.pop(0)
-            child2_index              = unreplaced_indices.pop(0)
+        #     child1_index              = unreplaced_indices.pop(0)
+        #     child2_index              = unreplaced_indices.pop(0)
 
-            population[child1_index]  = offspring1
-            population[child2_index]  = offspring2
-    
+        #     population[child1_index]  = offspring1
+        #     population[child2_index]  = offspring2
+
+        offspring1 = [[],[]]
+        offspring2 = [[],[]]
+        for chromosome in range(2):
+            mask = np.random.rand(chromosome_len) < crossover_rate
+            offspring1[chromosome] = np.where(mask, parent1[chromosome], parent2[chromosome])
+            offspring2[chromosome] = np.where(mask, parent2[chromosome], parent1[chromosome])
+
+        child1_index              = unreplaced_indices.pop(0)
+        child2_index              = unreplaced_indices.pop(0)
+
+        population[child1_index]  = offspring1
+        population[child2_index]  = offspring2
+
     return population
 
 
@@ -194,7 +208,7 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
     
     #Population Size = N
     max_Generation      = 500
-    max_No_improve      = 15
+    max_No_improve      = 30
     GBest               = float('inf')
     crossover_rate      = 0.7
     mutation_rate       = 0.3
@@ -230,7 +244,7 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
             generation += 1
             elapsed_time = time.time() - StartTime
 
-        sum_tardiness, X_ijk, S_ij, C_ij, C_j = decoding(S_k, S_j, G_OA, G_MS, chromosome_len, 
+        max_tardiness, X_ijk, S_ij, C_ij, C_j = decoding(S_k, S_j, G_OA, G_MS, chromosome_len, 
                                                     n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
 
     else:
@@ -240,13 +254,18 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
 
         for j in JSet:
             for i in OJSet[j]:
-                mask            = np.multiply(p_ijk[i][j], h_ijk[i][j])
-                mask[mask==0]   = np.inf
-                sum_values      = mask + S_k
-                k               = np.argmin(sum_values)
-                X_ijk[i][j][k]  = 1 
-                S_ij[i][j]      = max(S_k[k], S_j[j])
-                C_ij[i][j]      = S_ij[i][j] + p_ijk[i][j][k]
+                available           = np.maximum(self.S_j[j], self.S_k)
+                mask                = self.h_ijk[i, j, :] == 1
+                filtered_available  = available[mask]
+                
+                min_value           = np.min(filtered_available)
+                min_indices         = np.where(filtered_available == min_value)[0]
+                filtered_index      = np.random.choice(min_indices)
+                k                   = np.arange(len(available))[mask][filtered_index]
+
+                X_ijk[i][j][k]      = 1 
+                S_ij[i][j]          = max(S_k[k], S_j[j])
+                C_ij[i][j]          = S_ij[i][j] + p_ijk[i][j][k]
             
         GBest, C_j = evaluate_LocalCost(d_j, C_ij, JSet)
 
@@ -255,7 +274,10 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
 # ---------------------------------------------------------------------
 def get_cumulative_probability(k, operation, job, n_MC_ji, MC_ji):
     # Identify the index of k in MC_ji
-    index_k = MC_ji[job][operation].index(k)
+    if k in MC_ji[job][operation]:
+        index_k = MC_ji[job][operation].index(k)
+    else:
+        index_k = 0
     
     # Determine the segment range
     segment_size = 1 / n_MC_ji[job][operation]

@@ -1,0 +1,19 @@
+Defected Jobs
+JobID, Deadline_info, Description
+32        , 57600     , loose     
+48        , 57600     , loose     
+55        , 57600     , loose     
+182       , 57600     , loose     
+266       , 57600     , loose     
+269       , 57600     , loose     
+390       , 57600     , loose     
+446       , 57600     , loose     
+485       , 57600     , loose     
+503       , 57600     , loose     
+
+MachineBreakdown
+MachineID, BD_time, 	Re_time
+7         2520.0         4020.0         
+8         12360.0        5640.0         
+9         35280.0        2700.0         
+10        25620.0        6360.0         

@@ -1,33 +1,18 @@
 Defected Jobs
 JobID, Deadline_info, Description
-28        , 28800     , normal    
-55        , 28800     , normal    
 56        , 28800     , normal    
-60        , 28800     , normal    
-64        , 28800     , normal    
-84        , 28800     , normal    
-89        , 28800     , normal    
-90        , 28800     , normal    
-92        , 28800     , normal    
-99        , 28800     , normal    
-140       , 28800     , normal    
-165       , 28800     , normal    
-188       , 28800     , normal    
-214       , 28800     , normal    
-234       , 28800     , normal    
-365       , 28800     , normal    
-374       , 28800     , normal    
-427       , 28800     , normal    
-430       , 28800     , normal    
-490       , 28800     , normal    
-529       , 28800     , normal    
-535       , 28800     , normal    
-600       , 28800     , normal    
-613       , 28800     , normal    
-618       , 28800     , normal    
-624       , 28800     , normal    
-639       , 28800     , normal    
+109       , 28800     , normal    
+126       , 28800     , normal    
+206       , 28800     , normal    
+241       , 28800     , normal    
+262       , 28800     , normal    
+270       , 28800     , normal    
+338       , 28800     , normal    
+344       , 28800     , normal    
+350       , 28800     , normal    
 
 MachineBreakdown
 MachineID, BD_time, 	Re_time
-11        3900.0         1020.0         
+7         2160.0         4080.0         
+8         15960.0        4560.0         
+10        19860.0        5220.0         
