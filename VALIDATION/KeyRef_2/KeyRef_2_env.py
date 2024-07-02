@@ -96,6 +96,7 @@ class KeyRef2_Env(gym.Env):
 		C_j = np.max(self.C_ij, axis = 0)
 		T_j = np.maximum(C_j - self.d_j, 0)
 		self.tardiness = np.sum(T_j)
+		return self.tardiness
 
 	def perform_action(self):
 		method = Method(...)

@@ -1,6 +1,7 @@
 Defected Jobs
 JobID, Deadline_info, Description
+6        , 57600     , loose    
 
 Machine Breakdown
 MachineID, BD_time, 	Re_time
-12        6060.0         600.0          
+22        190.0         600.0          
