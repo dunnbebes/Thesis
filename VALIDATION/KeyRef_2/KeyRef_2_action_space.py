@@ -6,10 +6,10 @@ from time                   import time
 
 def action_space(J, K, p_ijk, h_ijk, d_j, n_j, 
                  S_k, S_j, MC_ji, n_ops_left_j, 
-                 JSet, T_cur, Tard_job):
+                 JSet, T_cur, X_ijk):
     method = Method(J, K, p_ijk, h_ijk, d_j, n_j, 
-                    S_k, S_j, MC_ji, n_ops_left_j, 
-                    JSet, T_cur, Tard_job)
+                 S_k, S_j, MC_ji, n_ops_left_j, 
+                 JSet, T_cur, X_ijk)
     return [
           method.CDR1
         , method.CDR2
@@ -23,7 +23,7 @@ def action_space(J, K, p_ijk, h_ijk, d_j, n_j,
 class Method:
     def __init__(self, J, K, p_ijk, h_ijk, d_j, n_j, 
                  S_k, S_j, MC_ji, n_ops_left_j, 
-                 JSet, T_cur, Tard_job):
+                 JSet, T_cur, X_ijk):
         
         self.J     			= copy.deepcopy(J)
         self.K  	   		= copy.deepcopy(K)
@@ -37,10 +37,11 @@ class Method:
         self.n_ops_left_j   = copy.deepcopy(n_ops_left_j)
         self.JSet           = copy.deepcopy(JSet)
         self.T_cur          = copy.deepcopy(T_cur)
-        self.Tard_job       = copy.deepcopy(Tard_job)
+        self.X_ijk          = copy.deepcopy(X_ijk)
 
 
     def CDR1(self):
+        self.Tard_job       = [j for j in self.JSet if self.d_j[j] < self.T_cur]
         p_mean              = np.mean(self.p_ijk*self.h_ijk, axis= 2)
 
         # Check if there is Tard_job
@@ -71,6 +72,7 @@ class Method:
     def CDR2(self):
         p_mean           = np.mean(self.p_ijk*self.h_ijk, axis= 2)
         OP               = self.n_j - self.n_ops_left_j
+        self.Tard_job    = [j for j in self.JSet if self.d_j[j] < self.T_cur]
         # Check if there is Tard_job
         if self.Tard_job:
             estimated_tardiness = np.full(self.J, -np.inf)
@@ -110,7 +112,7 @@ class Method:
         workload = np.full(self.K, np.inf)
         for k in self.MC_ji[j][i]:
             workload[k] = np.sum(self.p_ijk[ope, job, k] * self.X_ijk[ope, job, k] for job in range(self.J) for ope in range(int(self.n_j[job] - self.n_ops_left_j[job])) )
-        utilization = workload / self.T_cur
+        utilization = np.full(self.K, 0) if self.T_cur == 0 else workload / self.T_cur
 
         mask = self.h_ijk[i, j, :] == 1
         if r < 0.5:           
@@ -147,7 +149,7 @@ class Method:
     def CDR5(self):
         p_mean              = np.mean(self.p_ijk*self.h_ijk, axis= 2)        
         OP                  = self.n_j - self.n_ops_left_j
-
+        self.Tard_job       = [j for j in self.JSet if self.d_j[j] < self.T_cur]
         # Check if there is Tard_job
         if self.Tard_job:
             InversedCompletionRate_tardiness = np.full(self.J, -np.inf)

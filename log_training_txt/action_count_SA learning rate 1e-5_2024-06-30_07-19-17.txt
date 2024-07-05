@@ -1,0 +1,17 @@
+ Action  Count
+     GA      4
+     TS      4
+   LFOH   3953
+   LAPH      3
+LAP_LFO      6
+LFOH_TS      4
+LAPH_TS      4
+LFOH_GA      3
+LAPH_GA      2
+   CDR1      5
+   CDR2      7
+   CDR3      5
+   CDR4      2
+   CDR5      2
+   CDR6      2
+   RCRS      2
