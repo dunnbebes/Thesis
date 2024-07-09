@@ -8,7 +8,7 @@ import random
 import time  
 from time                   import time  
 from pulp                   import *                           
-from env_action.metaheu     import random_population, GeneticAlgorithm, encode_schedule, generate_neighborhood, TabuSearch
+from env_action.metaheu     import random_population, GeneticAlgorithm, encode_schedule, generate_neighborhood, TabuSearch, generate_dictionary_for_MS
 from util.util_action       import find_Mch_seq, evaluate_LocalCost, RightShift
 from scipy.optimize         import linear_sum_assignment
 
@@ -287,7 +287,7 @@ class Method:
         StartTime                     = time()
         population, chromosome_len    = random_population(self.OperationPool, self.PopSize)
         GBest, X_ijk, S_ij, C_ij, C_j = GeneticAlgorithm(self.S_k, self.S_j, self.JSet, self.OJSet, 
-                                                        self.J, self.I, self.K, 
+                                                        self.J, self.I, self.K,
                                                         self.p_ijk, self.h_ijk, self.d_j, self.n_j, self.n_ops_left_j, 
                                                         self.MC_ji, self.n_MC_ji, self.OperationPool,
                                                         self.PopSize, population, chromosome_len,
@@ -296,8 +296,9 @@ class Method:
     
     def TS(self):
         StartTime              = time()
-        OA, MS, chromosome_len = encode_schedule(self.J, self.I, self.n_j, self.X_ijk, self.S_ij, 
-                                                self.MC_ji, self.n_MC_ji, self.n_ops_left_j, self.t)
+        operations_map         = generate_dictionary_for_MS(self.OperationPool, self.n_j)
+        OA, MS, chromosome_len = encode_schedule(self.J, self.I, self.n_j, self.X_ijk, self.S_ij,
+                                                self.MC_ji, self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
         
         if self.NewJobList:
             for job, deadline in self.NewJobList:
@@ -311,8 +312,8 @@ class Method:
                     MS = MS + random_numbers
 
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
-                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, self.MC_ji, self.n_MC_ji, 
-                                                    OA, MS, chromosome_len, StartTime, self.maxtime)
+                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, operations_map,
+                                                    self.MC_ji, self.n_MC_ji, OA, MS, chromosome_len, StartTime, self.maxtime)
         return GBest, X_ijk, S_ij, C_ij, C_j
     
 
@@ -565,35 +566,38 @@ class Method:
         return GBest, X_ijk, S_ij, C_ij, C_j
     
     def LFOH_TS(self):
-        StartTime = time()
+        StartTime                     = time()
+        operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LFOH()
-        OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, 
-                                                        X_ijk, S_ij, self.MC_ji, self.n_MC_ji, self.n_ops_left_j,
-                                                        self.t)
+
+        OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
+                                                        self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
-                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, self.MC_ji, self.n_MC_ji, 
-                                                    OA, MS, chromosome_len, StartTime, self.maxtime)
+                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, operations_map,
+                                                    self.MC_ji, self.n_MC_ji, OA, MS, chromosome_len, StartTime, self.maxtime)
         return GBest, X_ijk, S_ij, C_ij, C_j
+    
     
     def LAPH_TS(self):
-        StartTime = time()
+        StartTime                     = time()
+        operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LAPH()
 
-        OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, 
-                                                        X_ijk, S_ij, self.MC_ji, self.n_MC_ji, self.n_ops_left_j,
-                                                        self.t)
+        OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
+                                                        self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
-                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, self.MC_ji, self.n_MC_ji, 
-                                                    OA, MS, chromosome_len, StartTime, self.maxtime)
-
+                                                    self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, operations_map,
+                                                    self.MC_ji, self.n_MC_ji, OA, MS, chromosome_len, StartTime, self.maxtime)
         return GBest, X_ijk, S_ij, C_ij, C_j
-    
+
+
     def LFOH_GA(self):
-        StartTime = time()
+        StartTime                     = time()
+        operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LFOH()
-        OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, 
-                                                        X_ijk, S_ij, self.MC_ji, self.n_MC_ji, self.n_ops_left_j,
-                                                        self.t)
+
+        OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
+                                                        self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
         current_solution              = (OA, MS)
         population                    = generate_neighborhood(current_solution, self.PopSize, chromosome_len)
         GBest, X_ijk, S_ij, C_ij, C_j = GeneticAlgorithm(self.S_k, self.S_j, self.JSet, self.OJSet, 
@@ -605,11 +609,12 @@ class Method:
         return GBest, X_ijk, S_ij, C_ij, C_j
     
     def LAPH_GA(self):
-        StartTime = time()
+        StartTime                     = time()
+        operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LAPH()
-        OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, 
-                                                        X_ijk, S_ij, self.MC_ji, self.n_MC_ji, self.n_ops_left_j,
-                                                        self.t)
+
+        OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
+                                                        self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
         current_solution              = (OA, MS)
         population                    = generate_neighborhood(current_solution, self.PopSize, chromosome_len)
         GBest, X_ijk, S_ij, C_ij, C_j = GeneticAlgorithm(self.S_k, self.S_j, self.JSet, self.OJSet, 
@@ -918,6 +923,7 @@ class Method:
             self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             
             # Adjust the set
+            print("job", j, "list", self.OJSet[j], "check", self.n_j[j], self.n_ops_left_j[j], i)
             self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:

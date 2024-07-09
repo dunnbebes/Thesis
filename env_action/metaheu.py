@@ -32,7 +32,7 @@ def random_population(OperationPool, N):
     return population, chromosome_len
 
 
-def decoding(S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j):
+def decoding(operations_map, S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j):
     S_ij      = np.zeros((I, J))
     C_ij      = np.zeros((I, J))
     X_ijk     = np.zeros((I, J, K))
@@ -46,12 +46,13 @@ def decoding(S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_
         if job not in counts:
             counts[job] = -1 + n_j[job] - n_ops_left_j[job]
         counts[job] += 1
-        operation   = type(job)(counts[job])
+        operation  = type(job)(counts[job])
         # Machine
-        random_num = MS[gene]
-        machine = select_machine(random_num, operation, job, n_MC_ji, MC_ji)
+        index      = operations_map.get((job, operation))
+        random_num = MS[index]
+        machine    = select_machine(random_num, operation, job, n_MC_ji, MC_ji)
         # Add to solution
-        sublist = [operation, job, machine]
+        sublist    = [operation, job, machine]
         Sol.append(sublist)
     
     # X_ij
@@ -90,18 +91,18 @@ def decoding(S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_
     return max_tardiness, X_ijk, S_ij, C_ij, C_j
 
 
-def evaluate(population, indices, chromosome_len, fitness, n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j, S_k, S_j):
+def evaluate(population, indices, chromosome_len, fitness, operations_map, n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j, S_k, S_j):
     for n in indices:
         OA                                    = population[n][0]
         MS                                    = population[n][1]
-        max_tardiness, X_ijk, S_ij, C_ij, C_j = decoding(S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
+        max_tardiness, X_ijk, S_ij, C_ij, C_j = decoding(operations_map, S_k, S_j, OA, MS, chromosome_len, n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
         fitness [n]                           = max_tardiness
     
     return fitness
 
 
 def tournament_selection(fitness, N, tournament_size):
-    target_length = N//2
+    target_length = N//3
     selected_indices = []
     for _ in range(target_length):
         participants = np.random.choice(range(N), size=tournament_size, replace=False)
@@ -126,31 +127,29 @@ def crossover(population, parent_indices, child_indices, crossover_rate, chromos
         chosen_parents_indices    = random.sample(parent_indices, 2)
         parent1                   = population[chosen_parents_indices[0]]
         parent2                   = population[chosen_parents_indices[1]]
-
-        # if random.random() <= crossover_rate:
-        #     offspring1 = parent1[0].copy(), parent1[1].copy()
-        #     offspring2 = parent2[0].copy(), parent2[1].copy()
-        
-        #     # Perform crossover for each chromosome
-        #     for chromosome in range(2):
-        #         point = random.randint(1, chromosome_len - 1)
-        #         offspring1[chromosome][:point] = parent1[chromosome][:point].copy()
-        #         offspring1[chromosome][point:] = parent2[chromosome][point:].copy()
-        #         offspring2[chromosome][:point] = parent2[chromosome][:point].copy()
-        #         offspring2[chromosome][point:] = parent1[chromosome][point:].copy()
-
-        #     child1_index              = unreplaced_indices.pop(0)
-        #     child2_index              = unreplaced_indices.pop(0)
-
-        #     population[child1_index]  = offspring1
-        #     population[child2_index]  = offspring2
-
-        offspring1 = [[],[]]
-        offspring2 = [[],[]]
-        for chromosome in range(2):
-            mask = np.random.rand(chromosome_len) < crossover_rate
-            offspring1[chromosome] = np.where(mask, parent1[chromosome], parent2[chromosome])
-            offspring2[chromosome] = np.where(mask, parent2[chromosome], parent1[chromosome])
+ 
+        if random.random() <= crossover_rate:
+            if random.random() <= 0.5:
+                offspring1 = parent1[0].copy(), parent1[1].copy()
+                offspring2 = parent2[0].copy(), parent2[1].copy()
+                # Perform crossover for each chromosome
+                for chromosome in range(2):
+                    point = random.randint(1, chromosome_len - 1)
+                    offspring1[chromosome][:point] = parent1[chromosome][:point].copy()
+                    offspring1[chromosome][point:] = parent2[chromosome][point:].copy()
+                    offspring2[chromosome][:point] = parent2[chromosome][:point].copy()
+                    offspring2[chromosome][point:] = parent1[chromosome][point:].copy()
+            else:
+                # Uniform crossover
+                offspring1 = [[],[]]
+                offspring2 = [[],[]]
+                for chromosome in range(2):
+                    mask = np.random.rand(chromosome_len) < crossover_rate
+                    offspring1[chromosome] = np.where(mask, parent1[chromosome], parent2[chromosome])
+                    offspring2[chromosome] = np.where(mask, parent2[chromosome], parent1[chromosome])
+        else:
+            offspring1 = parent1[0].copy(), parent1[1].copy()
+            offspring2 = parent2[0].copy(), parent2[1].copy()
 
         child1_index              = unreplaced_indices.pop(0)
         child2_index              = unreplaced_indices.pop(0)
@@ -201,23 +200,35 @@ def correction_offsprings(population, child_indices, value_counts, chromosome_le
     return population
 
 
+def generate_dictionary_for_MS (OperationPool, n_j):
+    operations_map = {}
+    current_index = 0
+    for idx, row in OperationPool.iterrows():
+        for op in range(n_j[row['Job']] - row['Num operation left'], n_j[row['Job']]):
+            operations_map[(row['Job'], op)] = current_index
+            current_index += 1
+
+    return operations_map
+
+
 def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K, 
                       p_ijk, h_ijk, d_j, n_j, n_ops_left_j, 
                       MC_ji, n_MC_ji, OperationPool, 
                       N, population, chromosome_len, StartTime, maxtime):
     
     #Population Size = N
-    max_Generation      = 500
-    max_No_improve      = 30
+    max_Generation      = 100
+    max_No_improve      = 15
     GBest               = float('inf')
     crossover_rate      = 0.7
     mutation_rate       = 0.3
-    tournament_size     = 3
+    tournament_size     = 10
     
     fitness             = np.zeros(N)
+    operations_map      = generate_dictionary_for_MS(OperationPool, n_j)
     if chromosome_len >= 2:
         value_counts    = dict(zip(OperationPool['Job'], OperationPool['Num operation left']))
-        fitness         = evaluate               (population, range(N), chromosome_len, fitness, 
+        fitness         = evaluate               (population, range(N), chromosome_len, fitness, operations_map,
                                                  n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j, S_k, S_j)
         generation      = 0
         no_improve      = 0
@@ -227,7 +238,7 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
             population                      = crossover              (population, parent_indices, child_indices, crossover_rate, chromosome_len)
             population                      = mutate                 (population, child_indices, mutation_rate, chromosome_len, J)
             population                      = correction_offsprings  (population, child_indices, value_counts, chromosome_len)
-            fitness                         = evaluate               (population, child_indices, chromosome_len, fitness, 
+            fitness                         = evaluate               (population, child_indices, chromosome_len, fitness, operations_map,
                                                                       n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j, S_k, S_j)
             
             LBest = np.min(fitness)
@@ -243,10 +254,10 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
 
             generation += 1
             elapsed_time = time.time() - StartTime
+            print(generation, GBest)
 
-        max_tardiness, X_ijk, S_ij, C_ij, C_j = decoding(S_k, S_j, G_OA, G_MS, chromosome_len, 
+        max_tardiness, X_ijk, S_ij, C_ij, C_j = decoding(operations_map, S_k, S_j, G_OA, G_MS, chromosome_len, 
                                                     n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
-
     else:
         X_ijk = np.zeros((I, J, K))
         S_ij  = np.zeros((I, J))
@@ -254,8 +265,8 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
 
         for j in JSet:
             for i in OJSet[j]:
-                available           = np.maximum(self.S_j[j], self.S_k)
-                mask                = self.h_ijk[i, j, :] == 1
+                available           = np.maximum(S_j[j], S_k)
+                mask                = h_ijk[i, j, :] == 1
                 filtered_available  = available[mask]
                 
                 min_value           = np.min(filtered_available)
@@ -321,7 +332,7 @@ def generate_neighborhood(solution, neighborhood_size, chromosome_len):
         neighbor = (tuple(neighbor_OA), tuple(neighbor_MS))
         neighborhood.add(neighbor)
         
-        # Crossover
+        # Crossover 1-point 
         crossover_point = random.randint(1, chromosome_len - 1)
         neighbor_OA = current_OA[crossover_point:] + current_OA[:crossover_point]
 
@@ -334,8 +345,7 @@ def generate_neighborhood(solution, neighborhood_size, chromosome_len):
     return [(list(OA), list(MS)) for OA, MS in neighborhood]
 
 
-def encode_schedule(J, I, n_j, X_ijk, S_ij, 
-                    MC_ji, n_MC_ji, n_ops_left_j, t):
+def encode_schedule(J, I, n_j, X_ijk, S_ij, MC_ji, n_MC_ji, n_ops_left_j, operations_map, t):
     
     for j in range(J):
         S_ij[n_j[j]:, j] = np.inf
@@ -355,31 +365,33 @@ def encode_schedule(J, I, n_j, X_ijk, S_ij,
 
     for gene in range(chromosome_len):
         job = OA[gene]
+    
         if job not in counts:
             counts[job] = -1 + n_j[job] - n_ops_left_j[job]
         counts[job] += 1
         operation = type(job)(counts[job])
         k         = X_ij[operation][job]
-        MS[gene]  = get_cumulative_probability(k, operation, job, n_MC_ji, MC_ji)
+        index     = operations_map.get((job, operation))
+        MS[index] = get_cumulative_probability(k, operation, job, n_MC_ji, MC_ji)
     
     return OA, MS, chromosome_len
 
 def TabuSearch (S_k, S_j, JSet, J, I, K, 
-                p_ijk, d_j, n_j, n_ops_left_j, 
+                p_ijk, d_j, n_j, n_ops_left_j, operations_map,
                 MC_ji, n_MC_ji, OA, MS, chromosome_len, StartTime, maxtime):
 
-    max_Generation                 = 500
+    max_Generation                 = 100
     max_No_improve                 = 15
     GBest                          = float('inf')
-    tabu_list_size                 = 10
-    neighborhood_size              = 5
+    tabu_list_size                 = 15
+    neighborhood_size              = 15
     current_solution               = (OA, MS)
     GSol                           = copy.deepcopy(current_solution)
   
-    tabu_list    = []
-    generation   = 0
-    no_improve   = 0
-    elapsed_time = 0
+    tabu_list                      = []
+    generation                     = 0
+    no_improve                     = 0
+    elapsed_time                   = 0
     while generation < max_Generation and no_improve < max_No_improve and elapsed_time < maxtime:
         # Generate the neighborhood of the current solution
         neighborhood = generate_neighborhood(current_solution, neighborhood_size, chromosome_len)
@@ -391,7 +403,7 @@ def TabuSearch (S_k, S_j, JSet, J, I, K,
             if neighbor not in tabu_list:
                 neighbor_OA = list(neighbor[0])
                 neighbor_MS = list(neighbor[1])
-                neighbor_objective, X, S, C, Cj = decoding(S_k, S_j, neighbor_OA, neighbor_MS, chromosome_len, 
+                neighbor_objective, X, S, C, Cj = decoding(operations_map, S_k, S_j, neighbor_OA, neighbor_MS, chromosome_len, 
                                                            n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
                 if neighbor_objective < best_neighbor_objective:
                     best_neighbor               = copy.deepcopy(neighbor)
@@ -413,10 +425,12 @@ def TabuSearch (S_k, S_j, JSet, J, I, K,
 
         generation += 1
         elapsed_time = time.time() - StartTime
+
+        print(generation, GBest)
         
     G_OA = list(GSol[0])
     G_MS = list(GSol[1])
-    GBest, X_ijk, S_ij, C_ij, C_j = decoding(S_k, S_j, G_OA, G_MS, chromosome_len, 
+    GBest, X_ijk, S_ij, C_ij, C_j = decoding(operations_map, S_k, S_j, G_OA, G_MS, chromosome_len, 
                                              n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
 
     return GBest, X_ijk, S_ij, C_ij, C_j

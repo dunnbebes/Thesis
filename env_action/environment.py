@@ -38,10 +38,10 @@ class FJSP_under_uncertainties_Env(gym.Env):
 
 		self.method_list 			 = ["GA", "TS", "LFOH", "LAPH", "LAP_LFO", 
 						  				"LFOH-TS", "LAPH-TS", "LFOH-GA", "LAPH-GA",
-						  				"CDR1", "CDR2", "CDR3", "CDR4", "CDR5", "CDR6",
+						  				"CDR1", "CDR2", "CDR3", "CDR5", "CDR6",
 										"RCRS"]
 
-		self.action_space = spaces.Discrete(16)
+		self.action_space = spaces.Discrete(15)
 		self.observation_space = spaces.Box(low=0, high=2,
 											shape=(16,), dtype=np.float32)
 
@@ -166,7 +166,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
         , method.CDR1
         , method.CDR2
         , method.CDR3
-        , method.CDR4
+        # , method.CDR4
         , method.CDR5
         , method.CDR6
         , method.RouteChange_RightShift
@@ -207,7 +207,6 @@ class FJSP_under_uncertainties_Env(gym.Env):
 																					self.org_J, self.org_p_ijk, self.org_h_ijk, self.org_n_j,               \
 																					self.org_MC_ji, self.org_n_MC_ji, self.C_j                              )																				
 
-	
 		# --------------------------------- Terminated, Reward,  Observation  ------------------------------------
 		if self.t >= np.max(self.C_ij) or self.triggered_event is None: 
 			self.done = True

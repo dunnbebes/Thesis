@@ -1,0 +1,2 @@
+ episode  sum_reward    tardiness
+       1   -1.203373 28795.066667
