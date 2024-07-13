@@ -122,7 +122,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		# Enviroment status	features	
 		U_ave  = np.mean(filtered_U_k)						# 1. Average machine utilization
 		U_std  = min(np.std(filtered_U_k), 2)				# 2. Std of machine utilization
-		C_all  = n_Ops/np.sum(self.n_j)						# 3. Completion rate of all operation
+		C_all  = 1 - n_Ops/np.sum(self.n_j)					# 3. Completion rate of all operation
 		C_ave  = np.mean(CR_j)								# 4. Average completion rate
 		C_std  = min(np.std(CR_j), 2)						# 5. Std of completion rate
 		Tard_e = Ne_tard/Ne_left 	    					# 6. Estimate tardiness rate

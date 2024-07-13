@@ -221,7 +221,7 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
     max_No_improve      = 15
     GBest               = float('inf')
     crossover_rate      = 0.7
-    mutation_rate       = 0.3
+    mutation_rate       = 0.2
     tournament_size     = 10
     
     fitness             = np.zeros(N)
@@ -233,7 +233,7 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
         generation      = 0
         no_improve      = 0
         elapsed_time    = 0
-        while generation < max_Generation and no_improve < max_No_improve and elapsed_time < maxtime:
+        while generation < max_Generation and no_improve < max_No_improve and elapsed_time < maxtime and GBest > 0:
             parent_indices, child_indices   = tournament_selection   (fitness, N, tournament_size)
             population                      = crossover              (population, parent_indices, child_indices, crossover_rate, chromosome_len)
             population                      = mutate                 (population, child_indices, mutation_rate, chromosome_len, J)
@@ -392,7 +392,7 @@ def TabuSearch (S_k, S_j, JSet, J, I, K,
     generation                     = 0
     no_improve                     = 0
     elapsed_time                   = 0
-    while generation < max_Generation and no_improve < max_No_improve and elapsed_time < maxtime:
+    while generation < max_Generation and no_improve < max_No_improve and elapsed_time < maxtime and GBest > 0:
         # Generate the neighborhood of the current solution
         neighborhood = generate_neighborhood(current_solution, neighborhood_size, chromosome_len)
         

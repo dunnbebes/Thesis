@@ -129,8 +129,8 @@ class KeyRef2_Env(gym.Env):
 	def step(self, action):
 		# ----------------------------------------------Action------------------------------------------------
 		method = self.method_list[action]
-		# print("-------------------------------------------------")
-		# print(f'Method selection:                    {method}')
+		print("-------------------------------------------------")
+		print(f'Method selection:                    {method}')
 		
 		action_method                   = self.perform_action()					    
 		operation_machine_selection     = action_method[action]
@@ -201,7 +201,7 @@ class KeyRef2_Env(gym.Env):
 			self.seed(seed)
 
 		super().reset(seed=seed)
-		
+		print("##################################### Reset")
 		self.done       = False
 		self.t          = 0
 		self.reward     = 0
@@ -210,7 +210,8 @@ class KeyRef2_Env(gym.Env):
 		self.pre_U_ave  = 0
 		
 		if test is None:
-			CaseID = random.choice(self.CaseList)
+			# CaseID = random.choice(self.CaseList)
+			CaseID                  = "_fixed_instance"
 			data_path               = f"DATA/SMALL/Case{CaseID}_480.txt"
 			self.J, self.I, self.K, self.p_ijk, self.h_ijk,\
 			self.d_j, self.n_j, self.MC_ji, self.n_MC_ji,  \
