@@ -41,19 +41,19 @@ class Method:
 
 
     def CDR1(self):
-        self.Tard_job       = [j for j in self.JSet if self.d_j[j] < self.T_cur]
-        p_mean              = np.mean(self.p_ijk*self.h_ijk, axis= 2)
+        self.Tard_job       = [j for j in self.JSet if self.d_j[j] < self.T_cur[j]]
+        p_mean              = np.sum(self.p_ijk*self.h_ijk, axis= 2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
 
         # Check if there is Tard_job
         if self.Tard_job:
             OP = self.n_j - self.n_ops_left_j
             estimated_tardiness = np.full(self.J, -np.inf)
             for j in self.Tard_job:
-                estimated_tardiness[j] = self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
+                estimated_tardiness[j] = self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
             j = np.argmax(estimated_tardiness)
         else:
             average_slack = np.full(self.J, np.inf)
-            average_slack[self.JSet] = (self.d_j[self.JSet] - self.T_cur)/self.n_ops_left_j[self.JSet]
+            average_slack[self.JSet] = (self.d_j[self.JSet] - self.T_cur[self.JSet])/self.n_ops_left_j[self.JSet]
             j = np.argmin(average_slack)
 
         i                   = self.n_j[j] - self.n_ops_left_j[j]
@@ -70,19 +70,19 @@ class Method:
 
 
     def CDR2(self):
-        p_mean           = np.mean(self.p_ijk*self.h_ijk, axis= 2)
+        p_mean           = np.sum(self.p_ijk*self.h_ijk, axis= 2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
         OP               = self.n_j - self.n_ops_left_j
-        self.Tard_job    = [j for j in self.JSet if self.d_j[j] < self.T_cur]
+        self.Tard_job    = [j for j in self.JSet if self.d_j[j] < self.T_cur[j]]
         # Check if there is Tard_job
         if self.Tard_job:
             estimated_tardiness = np.full(self.J, -np.inf)
             for j in self.Tard_job:
-                estimated_tardiness[j] = self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
+                estimated_tardiness[j] = self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
             j = np.argmax(estimated_tardiness)
         else:
             critical_ratio = np.full(self.J, np.inf)
             for j in self.JSet:
-                critical_ratio[j] = (self.d_j[j] - self.T_cur)/np.sum(p_mean[OP[j]:self.n_j[j], j])
+                critical_ratio[j] = (self.d_j[j] - self.T_cur[j])/np.sum(p_mean[OP[j]:self.n_j[j], j])
             j = np.argmin(critical_ratio)
 
         i                   = self.n_j[j] - self.n_ops_left_j[j]
@@ -98,13 +98,13 @@ class Method:
        
     
     def CDR3(self):
-        p_mean              = np.mean(self.p_ijk*self.h_ijk, axis= 2)
+        p_mean              = np.sum(self.p_ijk*self.h_ijk, axis= 2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
         OP                  = self.n_j - self.n_ops_left_j
 
         # Select job with largest estimated tardiness
         estimated_tardiness = np.full(self.J, -np.inf)
         for j in self.JSet:
-            estimated_tardiness[j] = self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
+            estimated_tardiness[j] = self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
         j = np.argmax(estimated_tardiness)
         i = self.n_j[j] - self.n_ops_left_j[j]
         # Select machine
@@ -112,7 +112,7 @@ class Method:
         workload = np.full(self.K, np.inf)
         for k in self.MC_ji[j][i]:
             workload[k] = np.sum(self.p_ijk[ope, job, k] * self.X_ijk[ope, job, k] for job in range(self.J) for ope in range(int(self.n_j[job] - self.n_ops_left_j[job])) )
-        utilization = np.full(self.K, 0) if self.T_cur == 0 else workload / self.T_cur
+        utilization = np.full(self.K, 0) if np.mean(self.S_k) == 0 else workload / np.mean(self.S_k)
 
         mask = self.h_ijk[i, j, :] == 1
         if r < 0.5:           
@@ -147,19 +147,19 @@ class Method:
 
     
     def CDR5(self):
-        p_mean              = np.mean(self.p_ijk*self.h_ijk, axis= 2)        
+        p_mean              = np.sum(self.p_ijk*self.h_ijk, axis= 2)/np.maximum(np.sum(self.h_ijk, axis=2),1)    
         OP                  = self.n_j - self.n_ops_left_j
-        self.Tard_job       = [j for j in self.JSet if self.d_j[j] < self.T_cur]
+        self.Tard_job       = [j for j in self.JSet if self.d_j[j] < self.T_cur[j]]
         # Check if there is Tard_job
         if self.Tard_job:
             InversedCompletionRate_tardiness = np.full(self.J, -np.inf)
             for j in self.Tard_job:
-                InversedCompletionRate_tardiness[j] = 0 if OP[j] == 0 else self.n_j[j]/OP[j] * (self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j])
+                InversedCompletionRate_tardiness[j] = 0 if OP[j] == 0 else self.n_j[j]/OP[j] * (self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j])
             j = np.argmax(InversedCompletionRate_tardiness)
         else:
             CompletionRate_slack = np.full(self.J, np.inf)
             for j in self.JSet:
-                CompletionRate_slack[j] = OP[j]/self.n_j[j] * (self.d_j[j] - self.T_cur)
+                CompletionRate_slack[j] = OP[j]/self.n_j[j] * (self.d_j[j] - self.T_cur[j])
             j = np.argmin(CompletionRate_slack)
 
         i                   = self.n_j[j] - self.n_ops_left_j[j]
@@ -174,12 +174,12 @@ class Method:
         return i, j, k
 
     def CDR6(self):
-        p_mean              = np.mean(self.p_ijk*self.h_ijk, axis= 2)
+        p_mean              = np.sum(self.p_ijk*self.h_ijk, axis= 2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
         OP                  = self.n_j - self.n_ops_left_j
 
         estimated_tardiness = np.full(self.J, -np.inf)
         for j in self.JSet:
-            estimated_tardiness[j] = self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
+            estimated_tardiness[j] = self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
         j                   = np.argmax(estimated_tardiness)
         i                   = self.n_j[j] - self.n_ops_left_j[j]
         # Find earliest available machine

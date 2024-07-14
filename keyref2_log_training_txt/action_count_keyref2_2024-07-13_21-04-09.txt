@@ -1,0 +1,7 @@
+Action  Count
+  CDR1   4392
+  CDR2   3133
+  CDR3  18775
+  CDR4   1663
+  CDR5   8295
+  CDR6   3742

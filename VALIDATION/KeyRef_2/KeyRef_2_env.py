@@ -53,22 +53,20 @@ class KeyRef2_Env(gym.Env):
 				Ne_left += self.n_ops_left_j[j]
 				T_left = 0
 				for i in range(self.n_j[j] - self.n_ops_left_j[j], self.n_j[j]): 
-					t_mean_ij = np.mean(self.p_ijk[i][j] * self.h_ijk[i][j])
+					t_mean_ij = np.sum(self.p_ijk[i, j]*self.h_ijk[i,j])/np.maximum(np.sum(self.h_ijk[i,j]),1)
 					T_left   += t_mean_ij
-					if self.T_cur + T_left > self.d_j[j]:
+					if self.T_cur[j] + T_left > self.d_j[j]:
 						Ne_tard += (self.n_j[j] - i) 
 						break
-
 		# Calculate actual tardiness rate 
 		Na_tard = 0
 		Na_left = 0 if self.done == False else 1
 		for j in range(self.J):
 			if self.n_ops_left_j[j] > 0:
-				Na_left += self.n_ops_left_j[j] > 0 
-				i = int(self.n_j[j] - self.n_ops_left_j[j])
+				Na_left += self.n_ops_left_j[j]
+				i = int(self.n_j[j] - self.n_ops_left_j[j]) - 1
 				if self.C_ij[i, j] > self.d_j[j]:
 					Na_tard += self.n_ops_left_j[j]
-
 		# Enviroment status	features	
 		self.U_ave  = np.mean(filtered_U_k)									# 1. Average machine utilization
 		U_std       = np.std(filtered_U_k) 									# 2. Std of machine utilization
@@ -128,10 +126,6 @@ class KeyRef2_Env(gym.Env):
 	"""################################################ S T E P ###################################################"""
 	def step(self, action):
 		# ----------------------------------------------Action------------------------------------------------
-		method = self.method_list[action]
-		print("-------------------------------------------------")
-		print(f'Method selection:                    {method}')
-		
 		action_method                   = self.perform_action()					    
 		operation_machine_selection     = action_method[action]
 		i, j, k                         = operation_machine_selection()
@@ -139,11 +133,11 @@ class KeyRef2_Env(gym.Env):
 		self.S_ij[i, j]                 = max(self.S_j[j], self.S_k[k])
 		self.C_ij[i, j]                 = self.S_ij[i, j] + self.p_ijk[i, j, k]  
 		self.S_k[k]                     = copy.deepcopy(self.C_ij[i, j])
-		self.T_cur                      = np.mean(self.S_k)
-
+		
 		self.n_ops_left_j[j] -= 1
 		if self.n_ops_left_j[j] != 0:
-			self.S_j[j] = copy.deepcopy(self.C_ij[i, j])
+			self.S_j[j]   = copy.deepcopy(self.C_ij[i, j])
+			self.T_cur[j] = np.mean(self.S_k[self.h_ijk[i+1,j] == 1])
             
 		else:
 			self.JSet.remove(j)
@@ -160,13 +154,6 @@ class KeyRef2_Env(gym.Env):
 				p_newjob_reshape           = copy.deepcopy(p_newjob[:, np.newaxis, :])
 				self.p_ijk                 = np.concatenate((self.p_ijk, p_newjob_reshape), axis= 1)
 
-				deadline, description = self.JA_event[j]
-				if description == "urgent":
-					d_newjob = np.sum(np.mean(p_newjob, axis=0)) *deadline
-				else:
-					d_newjob = deadline
-				self.d_j                   = np.append(self.d_j, d_newjob)
-
 				# capable machine            
 				h_newjob                   = copy.deepcopy(self.h_ijk[:, j, :])
 				h_newjob_reshape           = copy.deepcopy(h_newjob[:, np.newaxis, :])
@@ -181,12 +168,23 @@ class KeyRef2_Env(gym.Env):
 
 				self.S_j                    = np.append(self.S_j, 0)
 
+				T_cur_newjob			    = np.mean(self.S_k[h_newjob[0] == 1])
+				self.T_cur                  = np.append(self.T_cur, T_cur_newjob)
+
+				deadline, description = self.JA_event[j]
+				if description == "urgent":
+					d_newjob = np.sum(np.sum(p_newjob*h_newjob, axis=1)/np.maximum(np.sum(h_newjob, axis=1),1)) *deadline
+				else:
+					d_newjob = deadline
+				self.d_j                   = np.append(self.d_j, d_newjob)
 
 		# --------------------------------- Terminated, Reward,  Observation  ------------------------------------
 		if self.JSet: 
 			self.t = np.min(self.S_j[self.JSet])
 		else:
 			self.done = True
+			self.tardiness = self.calc_tardiness()
+			print("-- tard", self.tardiness)
 		
 		self.calc_observation()
 		self.calc_reward()
@@ -201,7 +199,6 @@ class KeyRef2_Env(gym.Env):
 			self.seed(seed)
 
 		super().reset(seed=seed)
-		print("##################################### Reset")
 		self.done       = False
 		self.t          = 0
 		self.reward     = 0
@@ -210,8 +207,8 @@ class KeyRef2_Env(gym.Env):
 		self.pre_U_ave  = 0
 		
 		if test is None:
-			# CaseID = random.choice(self.CaseList)
-			CaseID                  = "_fixed_instance"
+			CaseID = random.choice(self.CaseList)
+			# CaseID                  = "_fixed_instance"
 			data_path               = f"DATA/SMALL/Case{CaseID}_480.txt"
 			self.J, self.I, self.K, self.p_ijk, self.h_ijk,\
 			self.d_j, self.n_j, self.MC_ji, self.n_MC_ji,  \
@@ -225,7 +222,7 @@ class KeyRef2_Env(gym.Env):
 			self.d_j, self.n_j, self.MC_ji, self.n_MC_ji,  \
 			self.OperationPool      = read_txt(data_path)
 			
-			self.JA_event = self.scenarios[datatest + scenariotest]
+			self.JA_event           = self.scenarios[datatest + scenariotest]
 			
 
 		self.S_j                = np.zeros((self.J))
@@ -235,7 +232,7 @@ class KeyRef2_Env(gym.Env):
 		self.C_ij               = np.zeros((self.I, self.J))
 		self.JSet               = list(range(self.J))
 		self.n_ops_left_j       = copy.deepcopy(self.n_j)
-		self.T_cur              = 0
+		self.T_cur 				= np.zeros((self.J))
 
 		# ---------------------------------------------Observation--------------------------------------------
 		self.observation = np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.float32)

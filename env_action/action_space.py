@@ -34,7 +34,7 @@ def action_space(J, I, K, p_ijk, h_ijk, d_j, n_j,
         , method.CDR1
         , method.CDR2
         , method.CDR3
-        , method.CDR4
+        # , method.CDR4
         , method.CDR5
         , method.CDR6
         , method.RouteChange_RightShift
@@ -339,7 +339,8 @@ class Method:
 
         ready_time       = min(ORDict)
         ORSet            = copy.deepcopy(ORDict[ready_time])
-        sorted_operation = sorted(ORSet, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0], x[1]])))
+        p_mean           = np.sum(self.p_ijk*self.h_ijk, axis=2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
+        sorted_operation = sorted(ORSet, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], p_mean[x[0], x[1]]))
 
 
         while Reschedule_completion == False:
@@ -376,7 +377,7 @@ class Method:
             if ORDict:
                 ready_time       = min(ORDict)
                 ORSet            = copy.deepcopy(ORDict[ready_time])
-                sorted_operation = sorted(ORSet, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0], x[1]])))
+                sorted_operation = sorted(ORSet, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], p_mean[x[0], x[1]]))
             else: Reschedule_completion = True
 
         # Calculate GBest
@@ -524,7 +525,8 @@ class Method:
             unassigned_operations = [op for op in ORSet if op not in assigned_operations]
 
             if unassigned_operations:
-                sorted_operation = sorted(unassigned_operations, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], np.mean(self.p_ijk[x[0], x[1]])))
+                p_mean           = np.sum(self.p_ijk*self.h_ijk, axis=2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
+                sorted_operation = sorted(unassigned_operations, key=lambda x: (self.n_MC_ji[x[1]][x[0]], self.d_j[x[1]], p_mean[x[0], x[1]]))
                 for i, j in sorted_operation:
                     # Select machine
                     if self.n_MC_ji[j][i] == 1:
@@ -629,7 +631,7 @@ class Method:
         X_ijk            = np.zeros((self.I, self.J, self.K))
         S_ij             = np.zeros((self.I, self.J))
         C_ij             = np.zeros((self.I, self.J))
-        p_mean           = np.mean(self.p_ijk*self.h_ijk, axis= 2)
+        p_mean           = np.sum(self.p_ijk*self.h_ijk, axis=2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
         dummy_JSet       = copy.deepcopy(self.JSet)
         Reschedule_completion = False
 
@@ -639,11 +641,11 @@ class Method:
                 OP = self.n_j - self.n_ops_left_j
                 estimated_tardiness = np.full(self.J, -np.inf)
                 for j in self.Tard_job:
-                    estimated_tardiness[j] = self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
+                    estimated_tardiness[j] = self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
                 j = np.argmax(estimated_tardiness)
             else:
                 average_slack = np.full(self.J, np.inf)
-                average_slack[dummy_JSet] = (self.d_j[dummy_JSet] - self.T_cur)/self.n_ops_left_j[dummy_JSet]
+                average_slack[dummy_JSet] = (self.d_j[dummy_JSet] - self.T_cur[dummy_JSet])/self.n_ops_left_j[dummy_JSet]
                 j = np.argmin(average_slack)
 
             i                   = self.n_j[j] - self.n_ops_left_j[j]
@@ -660,19 +662,20 @@ class Method:
             S_ij[i, j]          = max(self.S_j[j], self.S_k[k])
             C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
             self.S_k[k]         = copy.deepcopy(C_ij[i, j])
+
             # Adjust the set
             self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
             else:
-                self.S_j[j] = copy.deepcopy(C_ij[i, j])
+                self.S_j[j]   = copy.deepcopy(C_ij[i, j])
+                self.T_cur[j] = np.mean(self.S_k[self.h_ijk[i+1,j] == 1])
 
             if not dummy_JSet:
                 Reschedule_completion = True
             else:
-                self.T_cur = np.mean(self.S_k)
-                self.Tard_job = [j for j in dummy_JSet if self.d_j[j] < self.T_cur]
+                self.Tard_job = [j for j in dummy_JSet if self.d_j[j] < self.T_cur[j]]
 
         # Calculate GBest
         GBest, C_j = evaluate_LocalCost(self.d_j, C_ij, self.JSet)
@@ -683,7 +686,7 @@ class Method:
         X_ijk            = np.zeros((self.I, self.J, self.K))
         S_ij             = np.zeros((self.I, self.J))
         C_ij             = np.zeros((self.I, self.J))
-        p_mean           = np.mean(self.p_ijk*self.h_ijk, axis= 2)
+        p_mean           = np.sum(self.p_ijk*self.h_ijk, axis=2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
         dummy_JSet       = copy.deepcopy(self.JSet)
         Reschedule_completion = False
         while Reschedule_completion == False:
@@ -693,12 +696,12 @@ class Method:
             if self.Tard_job:
                 estimated_tardiness = np.full(self.J, -np.inf)
                 for j in self.Tard_job:
-                    estimated_tardiness[j] = self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
+                    estimated_tardiness[j] = self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
                 j = np.argmax(estimated_tardiness)
             else:
                 critical_ratio = np.full(self.J, np.inf)
                 for j in dummy_JSet:
-                    critical_ratio[j] = (self.d_j[j] - self.T_cur)/np.sum(p_mean[OP[j]:self.n_j[j], j])
+                    critical_ratio[j] = (self.d_j[j] - self.T_cur[j])/np.sum(p_mean[OP[j]:self.n_j[j], j])
                 j = np.argmin(critical_ratio)
 
             i                   = self.n_j[j] - self.n_ops_left_j[j]
@@ -721,13 +724,13 @@ class Method:
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
             else:
-                self.S_j[j] = copy.deepcopy(C_ij[i, j])
+                self.S_j[j]   = copy.deepcopy(C_ij[i, j])
+                self.T_cur[j] = np.mean(self.S_k[self.h_ijk[i+1,j] == 1])
 
             if not dummy_JSet:
                 Reschedule_completion = True
             else:
-                self.T_cur = np.mean(self.S_k)
-                self.Tard_job = [j for j in dummy_JSet if self.d_j[j] < self.T_cur]
+                self.Tard_job = [j for j in dummy_JSet if self.d_j[j] < self.T_cur[j]]
 
         # Calculate GBest
         GBest, C_j = evaluate_LocalCost(self.d_j, C_ij, self.JSet)
@@ -740,7 +743,7 @@ class Method:
 
         S_ij             = np.zeros((self.I, self.J))
         C_ij             = np.zeros((self.I, self.J))
-        p_mean           = np.mean(self.p_ijk*self.h_ijk, axis= 2)
+        p_mean           = np.sum(self.p_ijk*self.h_ijk, axis=2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
         dummy_JSet       = copy.deepcopy(self.JSet)
         Reschedule_completion = False
         while Reschedule_completion == False:
@@ -749,7 +752,7 @@ class Method:
             # Select job with largest estimated tardiness
             estimated_tardiness = np.full(self.J, -np.inf)
             for j in dummy_JSet:
-                estimated_tardiness[j] = self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
+                estimated_tardiness[j] = self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
             j = np.argmax(estimated_tardiness)
             i = self.n_j[j] - self.n_ops_left_j[j]
             # Select machine
@@ -757,7 +760,7 @@ class Method:
             workload = np.full(self.K, np.inf)
             for k in self.MC_ji[j][i]:
                 workload[k] = np.sum(self.p_ijk[ope, job, k] * self.X_ijk[ope, job, k] for job in range(self.J) for ope in range(int(self.n_j[job] - self.n_ops_left_j[job])) )
-            utilization = workload / self.T_cur
+            utilization = workload / np.mean(self.S_k[self.S_k>0])
 
             mask = self.h_ijk[i, j, :] == 1
             if r < 0.5:           
@@ -777,19 +780,18 @@ class Method:
             S_ij[i, j]          = max(self.S_j[j], self.S_k[k])
             C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
             self.S_k[k]         = copy.deepcopy(C_ij[i, j])
-
+            
             # Adjust the set
             self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
             else:
-                self.S_j[j] = copy.deepcopy(C_ij[i, j])
+                self.S_j[j]   = copy.deepcopy(C_ij[i, j])
+                self.T_cur[j] = np.mean(self.S_k[self.h_ijk[i+1,j] == 1])
 
             if not dummy_JSet:
                 Reschedule_completion = True
-            else:
-                self.T_cur = np.mean(self.S_k)
 
         # Calculate GBest
         GBest, C_j = evaluate_LocalCost(self.d_j, C_ij, self.JSet)
@@ -840,7 +842,7 @@ class Method:
         X_ijk            = np.zeros((self.I, self.J, self.K))
         S_ij             = np.zeros((self.I, self.J))
         C_ij             = np.zeros((self.I, self.J))
-        p_mean           = np.mean(self.p_ijk*self.h_ijk, axis= 2)
+        p_mean           = np.sum(self.p_ijk*self.h_ijk, axis=2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
         dummy_JSet       = copy.deepcopy(self.JSet)
         Reschedule_completion = False
         while Reschedule_completion == False:
@@ -850,12 +852,12 @@ class Method:
             if self.Tard_job:
                 InversedCompletionRate_tardiness = np.full(self.J, -np.inf)
                 for j in self.Tard_job:
-                    InversedCompletionRate_tardiness[j] = 0 if OP[j] == 0 else self.n_j[j]/OP[j] * (self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j])
+                    InversedCompletionRate_tardiness[j] = 0 if OP[j] == 0 else self.n_j[j]/OP[j] * (self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j])
                 j = np.argmax(InversedCompletionRate_tardiness)
             else:
                 CompletionRate_slack = np.full(self.J, np.inf)
                 for j in dummy_JSet:
-                    CompletionRate_slack[j] = OP[j]/self.n_j[j] * (self.d_j[j] - self.T_cur)
+                    CompletionRate_slack[j] = OP[j]/self.n_j[j] * (self.d_j[j] - self.T_cur[j])
                 j = np.argmin(CompletionRate_slack)
 
             i                   = self.n_j[j] - self.n_ops_left_j[j]
@@ -879,12 +881,12 @@ class Method:
                 dummy_JSet.remove(j)
             else:
                 self.S_j[j] = copy.deepcopy(C_ij[i, j])
+                self.T_cur[j] = np.mean(self.S_k[self.h_ijk[i+1,j] == 1])
 
             if not dummy_JSet:
                 Reschedule_completion = True
             else:
-                self.T_cur = np.mean(self.S_k)
-                self.Tard_job = [j for j in dummy_JSet if self.d_j[j] < self.T_cur]
+                self.Tard_job = [j for j in dummy_JSet if self.d_j[j] < self.T_cur[j]]
 
         # Calculate GBest
         GBest, C_j = evaluate_LocalCost(self.d_j, C_ij, self.JSet)
@@ -896,7 +898,7 @@ class Method:
         X_ijk            = np.zeros((self.I, self.J, self.K))
         S_ij             = np.zeros((self.I, self.J))
         C_ij             = np.zeros((self.I, self.J))
-        p_mean           = np.mean(self.p_ijk*self.h_ijk, axis= 2)
+        p_mean           = np.sum(self.p_ijk*self.h_ijk, axis=2)/np.maximum(np.sum(self.h_ijk, axis=2),1)
         dummy_JSet       = copy.deepcopy(self.JSet)
         Reschedule_completion = False
 
@@ -905,7 +907,7 @@ class Method:
 
             estimated_tardiness = np.full(self.J, -np.inf)
             for j in dummy_JSet:
-                estimated_tardiness[j] = self.T_cur + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
+                estimated_tardiness[j] = self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
             j = np.argmax(estimated_tardiness)
             i                   = self.n_j[j] - self.n_ops_left_j[j]
             # Find earliest available machine
@@ -923,18 +925,16 @@ class Method:
             self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             
             # Adjust the set
-            print("job", j, "list", self.OJSet[j], "check", self.n_j[j], self.n_ops_left_j[j], i)
             self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
             else:
-                self.S_j[j] = copy.deepcopy(C_ij[i, j])
+                self.S_j[j]   = copy.deepcopy(C_ij[i, j])
+                self.T_cur[j] = np.mean(self.S_k[self.h_ijk[i+1,j] == 1])
 
             if not dummy_JSet:
-                Reschedule_completion = True
-            else:
-                self.T_cur = np.mean(self.S_k)
+                Reschedule_completion = True                
 
         # Calculate GBest
         GBest, C_j = evaluate_LocalCost(self.d_j, C_ij, self.JSet)
@@ -1028,28 +1028,29 @@ class Method:
                     Mch_seq_modified.append(Mch_seq)
 
                     ## Route-Change
-                    max_interval =  max(indirect_interval)
-                    k_index      =  indirect_interval.index(max_interval)
-                    new_k        =  indirect_RouteChange[k_index]
+                    if indirect_interval:
+                        max_interval =  max(indirect_interval)
+                        k_index      =  indirect_interval.index(max_interval)
+                        new_k        =  indirect_RouteChange[k_index]
 
-                    dummy_X_ijk  =  copy.deepcopy(self.X_ijk)
-                    dummy_X_ijk[i, j, new_k] = 1
-                    dummy_X_ijk[i, j, breakdown_MC] = 0
+                        dummy_X_ijk  =  copy.deepcopy(self.X_ijk)
+                        dummy_X_ijk[i, j, new_k] = 1
+                        dummy_X_ijk[i, j, breakdown_MC] = 0
 
-                    ## Change Mch seq
-                    dummy_Mch_seq = copy.deepcopy(Mch_seq)
-                    dummy_Mch_seq[breakdown_MC].remove(Oij)
-                    dummy_Mch_seq[new_k]       .insert(0, Oij)
+                        ## Change Mch seq
+                        dummy_Mch_seq = copy.deepcopy(Mch_seq)
+                        dummy_Mch_seq[breakdown_MC].remove(Oij)
+                        dummy_Mch_seq[new_k]       .insert(0, Oij)
 
-                    ## Right-Shift
-                    X_RCRS, S_RCRS, C_RCRS = RightShift(breakdown_MC, id_ope_onMCh, self.S_k[new_k], Job_seq, Mch_seq, dummy_X_ijk, self.S_ij, self.C_ij, self.p_ijk, self.n_j)
-                    cost_RCRS, redundant = evaluate_LocalCost(self.d_j, C_RCRS, self.JSet)
+                        ## Right-Shift
+                        X_RCRS, S_RCRS, C_RCRS = RightShift(breakdown_MC, id_ope_onMCh, self.S_k[new_k], Job_seq, Mch_seq, dummy_X_ijk, self.S_ij, self.C_ij, self.p_ijk, self.n_j)
+                        cost_RCRS, redundant = evaluate_LocalCost(self.d_j, C_RCRS, self.JSet)
 
-                    X_modified      .append(X_RCRS)
-                    S_modified      .append(S_RCRS)
-                    C_modified      .append(C_RCRS)
-                    cost_Modified   .append(cost_RCRS)
-                    Mch_seq_modified.append(dummy_Mch_seq)
+                        X_modified      .append(X_RCRS)
+                        S_modified      .append(S_RCRS)
+                        C_modified      .append(C_RCRS)
+                        cost_Modified   .append(cost_RCRS)
+                        Mch_seq_modified.append(dummy_Mch_seq)
   
                     for new_k in self.MC_ji[j][i]:
                         # machine breakdown

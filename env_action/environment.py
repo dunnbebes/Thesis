@@ -97,9 +97,9 @@ class FJSP_under_uncertainties_Env(gym.Env):
 				Ne_left += self.n_ops_left_j[j]
 				T_left = 0
 				for i in self.OJSet[j]: 
-					t_mean_ij = np.mean(self.p_ijk[i][j] * self.h_ijk[i][j])
+					t_mean_ij = np.sum(self.p_ijk[i, j]*self.h_ijk[i,j])/np.maximum(np.sum(self.h_ijk[i,j]),1)
 					T_left   += t_mean_ij
-					if self.T_cur + T_left > self.d_j[j]:
+					if self.T_cur[j] + T_left > self.d_j[j]:
 						Ne_tard += (self.n_j[j] - i) 
 						break
 
@@ -108,8 +108,8 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		Na_left = 0 if self.t < np.max(self.C_ij) else 1
 		for j in range(self.J):
 			if self.n_ops_left_j[j] > 0:
-				Na_left += self.n_ops_left_j[j] > 0 
-				i = int(self.n_j[j] - self.n_ops_left_j[j])
+				Na_left += self.n_ops_left_j[j] 
+				i = int(self.n_j[j] - self.n_ops_left_j[j]) -1
 				if self.C_ij[i, j] > self.d_j[j]:
 					Na_tard += self.n_ops_left_j[j]
 		
@@ -127,7 +127,6 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		C_std  = min(np.std(CR_j), 2)						# 5. Std of completion rate
 		Tard_e = Ne_tard/Ne_left 	    					# 6. Estimate tardiness rate
 		Tard_a = Na_tard/Na_left		    				# 7. Actual tardiness rate
-
 		observation = 	[n_Job, n_Ops, self.n_Mch, 
 				 		self.JA_boolean, self.JA_long_boolean, self.JA_urgent_boolean,
         				self.MB_boolean, self.MB_critical_boolean, self.sum_re,
@@ -179,7 +178,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 
 		# ----------------------------------------------Action------------------------------------------------
 		method = self.method_list[action]
-		print("-------------------------------------------------")
+		# print("-------------------------------------------------")
 		print(f'Method selection:                    {method}')
 		
 		action_method                                = self.perform_action()					    

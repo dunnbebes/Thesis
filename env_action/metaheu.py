@@ -254,7 +254,6 @@ def GeneticAlgorithm (S_k, S_j, JSet, OJSet, J, I, K,
 
             generation += 1
             elapsed_time = time.time() - StartTime
-            print(generation, GBest)
 
         max_tardiness, X_ijk, S_ij, C_ij, C_j = decoding(operations_map, S_k, S_j, G_OA, G_MS, chromosome_len, 
                                                     n_MC_ji, MC_ji, I, J, K, JSet, p_ijk, d_j, n_j, n_ops_left_j)
@@ -425,8 +424,6 @@ def TabuSearch (S_k, S_j, JSet, J, I, K,
 
         generation += 1
         elapsed_time = time.time() - StartTime
-
-        print(generation, GBest)
         
     G_OA = list(GSol[0])
     G_MS = list(GSol[1])

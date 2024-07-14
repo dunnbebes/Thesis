@@ -247,7 +247,9 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
         for uncertain_type, partID, time_event, description in triggered_event:
             if uncertain_type == "MB": 
                 MB[partID].append((time_event, description))    # if Machine break down
-                if description == "critical": MB_critical_boolean = 1
+                if description == "critical": 
+                    MB_critical_boolean = 1
+                    print('MB: critical')
             else:            
                 JA.append((partID, time_event, description))   # if Job arrival
 
@@ -303,16 +305,7 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                 p_newjob                   = copy.deepcopy(org_p_ijk[:, jobresemble, :])
                 p_newjob_reshape           = copy.deepcopy(p_newjob[:, np.newaxis, :])
                 p_ijk                      = np.concatenate((p_ijk, p_newjob_reshape), axis= 1)
-                TPT                        = np.sum(np.mean(p_newjob, axis= 1))
-                if TPT > 1000:
-                    JA_long_boolean = 1
-                # deadline
-                if description == "urgent":
-                    d_newjob = TPT*deadline
-                    JA_urgent_boolean = 1
-                else:
-                    d_newjob = deadline
-                d_j                        = np.append(d_j, d_newjob)
+                
                 # capable machine            
                 h_newjob                   = copy.deepcopy(org_h_ijk[:, jobresemble, :])
                 h_newjob_reshape           = copy.deepcopy(h_newjob[:, np.newaxis, :])
@@ -337,14 +330,28 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                 OJSet.append(list(range(int(n_newjob))))
                 ODSet.append([])
 
+                TPT                        = np.sum(np.sum(p_newjob * h_newjob, axis= 1)/ np.maximum(np.sum(h_newjob, axis=1),1))
+                if TPT > 1000:
+                    JA_long_boolean = 1
+                    print("JA: long TPT")
+                # deadline
+                if description == "urgent":
+                    d_newjob = TPT*deadline
+                    JA_urgent_boolean = 1
+                    print("JA: urgent")
+                else:
+                    d_newjob = deadline
+                d_j                        = np.append(d_j, d_newjob)
+
                 # X, S, C
                 X_ijk          = np.pad(X_ijk,     ((0, 0), (0, 1), (0, 0)), mode='constant', constant_values=0)
                 S_ij           = np.pad(S_ij,      ((0, 0), (0, 1)),         mode='constant', constant_values=0)
                 C_ij           = np.pad(C_ij,      ((0, 0), (0, 1)),         mode='constant', constant_values=0)
                 C_j            = np.pad(C_j,       ((0, 1)),                 mode='constant', constant_values=0)
                 """"Check urgency"""
+                h_excluded     = h_newjob[1:int(n_newjob -1)]
                 p_excluded     = p_newjob[1:int(n_newjob -1)]
-                LC_firstope    = d_newjob - np.sum(np.mean(p_excluded, axis=1))
+                LC_firstope    = d_newjob - np.sum(np.sum(p_excluded*h_excluded, axis=1)/np.maximum(np.sum(h_excluded, axis=1),1))
 
                 Acceptable     = [k for k in MC_newjob[0] if S_k[k] + p_newjob[0][k] <= LC_firstope]
                 if len(Acceptable) == 0:
@@ -358,7 +365,7 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                             j = copy.deepcopy(operation[1][0])
 
                             # Calculate LC of the operation
-                            mean_p = np.mean(p_ijk[:, j, :], axis=1)
+                            mean_p = np.sum(p_ijk[:,j,:]*h_ijk[:,j,:], axis=1)/np.maximum(np.sum(h_ijk[:,j,:], axis=1), 1)
                             LC_operation_on_k[k] = d_j[j] - np.sum(mean_p[i+1 : int(n_j[j]-1)])
 
                     # Consider to remove current operation on machine
@@ -395,6 +402,7 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
     JA_boolean = 1 if JA else 0
     MB_boolean = 1 if any(breakdown for breakdown in MB) else 0
     sum_re     = np.sum(re)/(60*60*3)
+    print('sum_re:', sum_re)
     # Find completion time of last operation assigned to machine k at rescheduling point t
     CT_k = np.zeros(K)
     for k in range(K):  
@@ -404,8 +412,14 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
             i, j      = indices[max_index]
             CT_k[k]   = C_ij[i, j] 
 
-    T_cur    = np.mean(S_k)
-    Tard_job = [j for j in JSet if d_j[j] < T_cur]
+
+    T_cur  = np.zeros((J))
+    OP_cur = (n_j - n_ops_left_j).astype(int)
+    for j in JSet:
+        i = OP_cur[j]
+        T_cur[j] = np.mean(S_k[h_ijk[i,j] == 1])
+
+    Tard_job = [j for j in JSet if d_j[j] < T_cur[j]]
 
     return  S_k, S_j, J, I, JSet, OJSet, DSet, ODSet, OperationPool, \
             n_ops_left_j, MC_ji, n_MC_ji, d_j, n_j, p_ijk, h_ijk,    \
