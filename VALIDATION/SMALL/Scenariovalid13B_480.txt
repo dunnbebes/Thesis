@@ -1,0 +1,12 @@
+Defected Jobs
+JobID, Deadline_info, Description
+48        , 28800     , normal    
+103       , 28800     , normal    
+160       , 28800     , normal    
+163       , 28800     , normal    
+241       , 28800     , normal    
+264       , 28800     , normal    
+267       , 28800     , normal    
+
+MachineBreakdown
+MachineID, BD_time, 	Re_time
