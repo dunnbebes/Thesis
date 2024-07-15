@@ -249,7 +249,6 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                 MB[partID].append((time_event, description))    # if Machine break down
                 if description == "critical": 
                     MB_critical_boolean = 1
-                    print('MB: critical')
             else:            
                 JA.append((partID, time_event, description))   # if Job arrival
 
@@ -333,12 +332,10 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                 TPT                        = np.sum(np.sum(p_newjob * h_newjob, axis= 1)/ np.maximum(np.sum(h_newjob, axis=1),1))
                 if TPT > 1000:
                     JA_long_boolean = 1
-                    print("JA: long TPT")
                 # deadline
                 if description == "urgent":
                     d_newjob = TPT*deadline
                     JA_urgent_boolean = 1
-                    print("JA: urgent")
                 else:
                     d_newjob = deadline
                 d_j                        = np.append(d_j, d_newjob)
@@ -402,7 +399,6 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
     JA_boolean = 1 if JA else 0
     MB_boolean = 1 if any(breakdown for breakdown in MB) else 0
     sum_re     = np.sum(re)/(60*60*3)
-    print('sum_re:', sum_re)
     # Find completion time of last operation assigned to machine k at rescheduling point t
     CT_k = np.zeros(K)
     for k in range(K):  
@@ -420,6 +416,8 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
         T_cur[j] = np.mean(S_k[h_ijk[i,j] == 1])
 
     Tard_job = [j for j in JSet if d_j[j] < T_cur[j]]
+
+    print(JA_boolean, JA_long_boolean, JA_urgent_boolean, MB_boolean, MB_critical_boolean, sum_re)
 
     return  S_k, S_j, J, I, JSet, OJSet, DSet, ODSet, OperationPool, \
             n_ops_left_j, MC_ji, n_MC_ji, d_j, n_j, p_ijk, h_ijk,    \
