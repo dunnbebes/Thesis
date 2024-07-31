@@ -182,9 +182,10 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		print(f'Method selection:                    {method}')
 		
 		action_method                                = self.perform_action()					    
-		reschedule							         = action_method[action]
+		reschedule							         = copy.deepcopy(action_method[action])
 		self.GBest, \
-		self.X_ijk, self.S_ij, self.C_ij, self.C_j   = reschedule()
+		self.X_ijk, self.S_ij, self.C_ij, self.C_j   = reschedule()		
+
 		self.X_ijk, self.S_ij, self.C_ij, self.C_j   = update_schedule(self.DSet, self.ODSet, self.t, self.X_ijk, self.S_ij, self.C_ij,\
 																       self.X_previous, self.S_previous, self.C_previous)
 
@@ -233,7 +234,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 				else:
 					self.load_scenario(random.choice(self.list_scenarios))
 			else:
-				if self.num_scenario_per_instance >= 10:
+				if self.num_scenario_per_instance >= 4:
 					self.num_scenario_per_instance = 0
 					self.instance_id 			   = random.choice(self.list_instances)
 				self.num_scenario_per_instance +=1

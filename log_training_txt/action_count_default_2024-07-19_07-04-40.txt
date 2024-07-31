@@ -1,0 +1,16 @@
+ Action  Count
+     GA     60
+     TS   1200
+   LFOH     64
+   LAPH     61
+LAP_LFO     58
+LFOH_TS    318
+LAPH_TS     57
+LFOH_GA    450
+LAPH_GA    812
+   CDR1    213
+   CDR2     51
+   CDR3    267
+   CDR5   1215
+   CDR6   1160
+   RCRS     58

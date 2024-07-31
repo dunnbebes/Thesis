@@ -7,7 +7,7 @@ import copy
 import random
 import time  
 from time                   import time  
-from pulp                   import *                           
+# from pulp                   import *                           
 from env_action.metaheu     import random_population, GeneticAlgorithm, encode_schedule, generate_neighborhood, TabuSearch, generate_dictionary_for_MS
 from util.util_action       import find_Mch_seq, evaluate_LocalCost, RightShift
 from scipy.optimize         import linear_sum_assignment
@@ -571,9 +571,10 @@ class Method:
         StartTime                     = time()
         operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LFOH()
-
+        print('before encode')
         OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
                                                         self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
+        print('after encode')
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
                                                     self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, operations_map,
                                                     self.MC_ji, self.n_MC_ji, OA, MS, chromosome_len, StartTime, self.maxtime)
@@ -584,9 +585,10 @@ class Method:
         StartTime                     = time()
         operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LAPH()
-
+        print('before encode')
         OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
                                                         self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
+        print('after encode')
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
                                                     self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, operations_map,
                                                     self.MC_ji, self.n_MC_ji, OA, MS, chromosome_len, StartTime, self.maxtime)
@@ -597,11 +599,13 @@ class Method:
         StartTime                     = time()
         operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LFOH()
-
+        print('before encode')
         OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
                                                         self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
+        print('after encode')
         current_solution              = (OA, MS)
         population                    = generate_neighborhood(current_solution, self.PopSize, chromosome_len)
+        print('after generate')
         GBest, X_ijk, S_ij, C_ij, C_j = GeneticAlgorithm(self.S_k, self.S_j, self.JSet, self.OJSet, 
                                                     self.J, self.I, self.K, 
                                                     self.p_ijk, self.h_ijk, self.d_j, self.n_j, self.n_ops_left_j, 
@@ -614,11 +618,13 @@ class Method:
         StartTime                     = time()
         operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LAPH()
-
+        print('before encode')
         OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
                                                         self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
+        print('after encode')
         current_solution              = (OA, MS)
         population                    = generate_neighborhood(current_solution, self.PopSize, chromosome_len)
+        print('after generate')
         GBest, X_ijk, S_ij, C_ij, C_j = GeneticAlgorithm(self.S_k, self.S_j, self.JSet, self.OJSet, 
                                                     self.J, self.I, self.K, 
                                                     self.p_ijk, self.h_ijk, self.d_j, self.n_j, self.n_ops_left_j, 

@@ -302,8 +302,8 @@ def get_cumulative_probability(k, operation, job, n_MC_ji, MC_ji):
 def generate_neighborhood(solution, neighborhood_size, chromosome_len):
     current_OA   = list(solution[0])
     current_MS   = list(solution[1])
-    neighborhood = set()
-    
+    neighborhood = []
+
     while len(neighborhood) < neighborhood_size:
         # Randomly choose two distinct positions for insertion
         i, j = random.sample(range(chromosome_len), 2)
@@ -316,8 +316,8 @@ def generate_neighborhood(solution, neighborhood_size, chromosome_len):
         element_MS = neighbor_MS.pop(i)
         neighbor_MS.insert(j, element_MS)
 
-        neighbor = (tuple(neighbor_OA), tuple(neighbor_MS))
-        neighborhood.add(neighbor)
+        neighbor = (neighbor_OA, neighbor_MS)
+        neighborhood.append(neighbor)
         
         # Randomly choose two adjacent positions for swapping
         k = random.randint(0, chromosome_len - 2)
@@ -328,8 +328,8 @@ def generate_neighborhood(solution, neighborhood_size, chromosome_len):
         neighbor_MS = current_MS[:]
         neighbor_MS[k], neighbor_MS[k + 1] = neighbor_MS[k + 1], neighbor_MS[k]
 
-        neighbor = (tuple(neighbor_OA), tuple(neighbor_MS))
-        neighborhood.add(neighbor)
+        neighbor = (neighbor_OA, neighbor_MS)
+        neighborhood.append(neighbor)
         
         # Crossover 1-point 
         crossover_point = random.randint(1, chromosome_len - 1)
@@ -338,10 +338,11 @@ def generate_neighborhood(solution, neighborhood_size, chromosome_len):
         crossover_point = random.randint(1, chromosome_len - 1)
         neighbor_MS = current_MS[crossover_point:] + current_MS[:crossover_point]
 
-        neighbor = (tuple(neighbor_OA), tuple(neighbor_MS))
-        neighborhood.add(neighbor)
+        neighbor = (neighbor_OA, neighbor_MS)
+        neighborhood.append(neighbor)
+
     
-    return [(list(OA), list(MS)) for OA, MS in neighborhood]
+    return neighborhood
 
 
 def encode_schedule(J, I, n_j, X_ijk, S_ij, MC_ji, n_MC_ji, n_ops_left_j, operations_map, t):
@@ -396,7 +397,7 @@ def TabuSearch (S_k, S_j, JSet, J, I, K,
         neighborhood = generate_neighborhood(current_solution, neighborhood_size, chromosome_len)
         
         # Find the best non-tabu solution in the neighborhood
-        best_neighbor = None
+        best_neighbor = copy.deepcopy(current_solution)
         best_neighbor_objective = float('inf')
         for neighbor in neighborhood:
             if neighbor not in tabu_list:
@@ -409,7 +410,7 @@ def TabuSearch (S_k, S_j, JSet, J, I, K,
                     best_neighbor_objective     = copy.deepcopy(neighbor_objective)
         
         # Update the current solution and the best solution
-        current_solution = best_neighbor
+        current_solution = copy.deepcopy(best_neighbor)
         if best_neighbor_objective < GBest:
             GSol  = copy.deepcopy(best_neighbor)
             GBest = copy.deepcopy(best_neighbor_objective)

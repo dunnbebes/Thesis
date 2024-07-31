@@ -130,11 +130,12 @@ def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record
                 events[time_occur] = []
             events[time_occur].append(("MB", k, repair, description))
     
-    re            = np.zeros((K)) 
+    
     if have_event == True:
         found         = None
         while found == None:
             if events:
+                re              = np.zeros((K)) 
                 affected_Oij    = {}
                 new_t           = copy.deepcopy(int(min(events.keys())))
                 triggered_event = copy.deepcopy(events[new_t])
@@ -182,6 +183,7 @@ def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record
                 break
 
         if events: # After While loop, If have events
+            re = np.zeros((K))
             for uncertain_type, partID, time_event, description in triggered_event:
                 if uncertain_type == "JA":
                     JA_event = [JA for JA in JA_event if JA[0] != partID]
@@ -191,6 +193,7 @@ def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record
                     record = (new_time, new_time+re[partID])
                     MB_record[partID].append(record)
                     MB_event[partID].pop(0)
+                    re[partID] = copy.deepcopy(time_event)
             # for key, value in events.items():
             #     if key < new_time:
             #         new_key = new_time + 60
@@ -200,14 +203,22 @@ def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record
             #             events[new_key] = value
             if not triggered_event:
                 new_time = np.max(C_j)
-                triggered_event = None     
+                triggered_event = None  
+                re = np.zeros((K))   
         else:
             new_time = np.max(C_j)
             triggered_event = None 
+            re = np.zeros((K))
 
     else:
         new_time = np.max(C_j)
-        triggered_event = None  
+        triggered_event = None 
+        re = np.zeros((K)) 
+    
+    if new_time > np.max(C_j):
+        new_time = np.max(C_j)
+        triggered_event = None
+        re = np.zeros((K))  
     
     return JA_event, MB_event, new_time, triggered_event, re, MB_record
 
@@ -417,7 +428,7 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
 
     Tard_job = [j for j in JSet if d_j[j] < T_cur[j]]
 
-    print(JA_boolean, JA_long_boolean, JA_urgent_boolean, MB_boolean, MB_critical_boolean, sum_re)
+    print(JA_boolean, JA_long_boolean, JA_urgent_boolean, "----", MB_boolean, MB_critical_boolean, sum_re)
 
     return  S_k, S_j, J, I, JSet, OJSet, DSet, ODSet, OperationPool, \
             n_ops_left_j, MC_ji, n_MC_ji, d_j, n_j, p_ijk, h_ijk,    \
