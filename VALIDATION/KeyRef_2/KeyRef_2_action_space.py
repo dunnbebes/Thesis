@@ -59,7 +59,10 @@ class Method:
         i                   = self.n_j[j] - self.n_ops_left_j[j]
         # Find earliest available machine
         available           = np.maximum(self.S_j[j], self.S_k)
+
+        
         mask                = self.h_ijk[i, j, :] == 1
+        
         filtered_available  = available[mask]
         min_value           = np.min(filtered_available)
         min_indices         = np.where(filtered_available == min_value)[0]
@@ -88,7 +91,10 @@ class Method:
         i                   = self.n_j[j] - self.n_ops_left_j[j]
         # Find earliest available machine
         available           = np.maximum(self.S_j[j], self.S_k)
+
+        
         mask                = self.h_ijk[i, j, :] == 1
+        
         filtered_available  = available[mask]
         min_value           = np.min(filtered_available)
         min_indices         = np.where(filtered_available == min_value)[0]
@@ -114,15 +120,19 @@ class Method:
             workload[k] = np.sum(self.p_ijk[ope, job, k] * self.X_ijk[ope, job, k] for job in range(self.J) for ope in range(int(self.n_j[job] - self.n_ops_left_j[job])) )
         utilization = np.full(self.K, 0) if np.mean(self.S_k) == 0 else workload / np.mean(self.S_k)
 
+        
         mask = self.h_ijk[i, j, :] == 1
+        
         if r < 0.5:           
             filtered_available  = utilization[mask]
+
             min_value           = np.min(filtered_available)
             min_indices         = np.where(filtered_available == min_value)[0]
             filtered_index      = np.random.choice(min_indices)
             k                   = np.arange(len(utilization))[mask][filtered_index]
         else:
             filtered_available  = workload[mask]
+
             min_value           = np.min(filtered_available)
             min_indices         = np.where(filtered_available == min_value)[0]
             filtered_index      = np.random.choice(min_indices)
@@ -137,7 +147,10 @@ class Method:
         i                   = self.n_j[j] - self.n_ops_left_j[j]
         # Find earliest available machine
         available           = np.maximum(self.S_j[j], self.S_k)
+
+        
         mask                = self.h_ijk[i, j, :] == 1
+
         filtered_available  = available[mask]
         min_value           = np.min(filtered_available)
         min_indices         = np.where(filtered_available == min_value)[0]
@@ -165,7 +178,10 @@ class Method:
         i                   = self.n_j[j] - self.n_ops_left_j[j]
         # Find earliest available machine
         available           = np.maximum(self.S_j[j], self.S_k)
+
+        
         mask                = self.h_ijk[i, j, :] == 1
+
         filtered_available  = available[mask]
         min_value           = np.min(filtered_available)
         min_indices         = np.where(filtered_available == min_value)[0]
@@ -184,7 +200,10 @@ class Method:
         i                   = self.n_j[j] - self.n_ops_left_j[j]
         # Find earliest available machine
         available           = np.maximum(self.S_j[j], self.S_k)
+
+        
         mask                = self.h_ijk[i, j, :] == 1
+
         filtered_available  = available[mask]
         
         min_value           = np.min(filtered_available)

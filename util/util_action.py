@@ -19,6 +19,7 @@ def evaluate_LocalCost(d_j, C_ij, JSet):
 
 
 def RightShift (Mch, id_ope_onMch, time_available, dummy_Job_seq, dummy_Mch_seq, dummy_Xijk, dummy_Sij, dummy_Cij, p_ijk, n_j):
+    # print(Mch, id_ope_onMch, "\n", dummy_Mch_seq[Mch])
     Oij = dummy_Mch_seq[Mch][id_ope_onMch]
     i   = Oij[0]
     j   = Oij[1]
@@ -39,7 +40,12 @@ def RightShift (Mch, id_ope_onMch, time_available, dummy_Job_seq, dummy_Mch_seq,
         # Consider successing operation on the same Job
         if i < int(n_j[j]) - 1:
             next_Oij          = [i+1, j]
-            that_Mch          = np.argwhere(dummy_Xijk[i+1, j, :] == 1)[0][0]
-            that_id_ope_onMch = next((i for i, sublist in enumerate(dummy_Mch_seq[that_Mch]) if sublist == next_Oij), -1)
-            RightShift(that_Mch, that_id_ope_onMch, next_time_available, dummy_Job_seq, dummy_Mch_seq, dummy_Xijk, dummy_Sij, dummy_Cij, p_ijk, n_j)
+
+            matches = np.argwhere(dummy_Xijk[i+1, j, :] == 1)
+
+            if matches.size > 0:
+                that_Mch = matches[0][0] 
+                that_id_ope_onMch = next((i for i, sublist in enumerate(dummy_Mch_seq[that_Mch]) if sublist == next_Oij), -1)
+                RightShift(that_Mch, that_id_ope_onMch, next_time_available, dummy_Job_seq, dummy_Mch_seq, dummy_Xijk, dummy_Sij, dummy_Cij, p_ijk, n_j)
+                
         return dummy_Xijk, dummy_Sij, dummy_Cij
