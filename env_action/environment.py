@@ -15,7 +15,8 @@ class FJSP_under_uncertainties_Env(gym.Env):
 	"""Custom Environment that follows gym interface"""
 
 	def __init__(self, fixed_instance, fixed_scenario, instances, scenarios, K, WeibullDistribution, 
-			  critical_machines, ReworkProbability, planning_horizon, PopSize, maxtime, maxJob, maxOpe, reward_ratio):
+			  critical_machines, ReworkProbability, planning_horizon, PopSize, maxtime, maxJob, maxOpe, reward_ratio,
+			  master, tight_duedate_setting, JA_only_setting):
 		super(FJSP_under_uncertainties_Env, self).__init__()
 
 		self.K              		 	= copy.deepcopy(K)
@@ -36,6 +37,9 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		self.list_scenarios 			= list(self.scenarios.keys())
 		self.num_scenario_per_instance 	= 10
 
+		self.master 					= copy.deepcopy(master)
+		self.tight_duedate_setting 		= copy.deepcopy(tight_duedate_setting)
+		self.JA_only_setting			= copy.deepcopy(JA_only_setting)
 		self.method_list 			 = ["GA", "TS", "LFOH", "LAPH", "LAP_LFO", 
 						  				"LFOH-TS", "LAPH-TS", "LFOH-GA", "LAPH-GA",
 						  				"CDR1", "CDR2", "CDR3", "CDR5", "CDR6",
@@ -68,10 +72,15 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		self.org_MC_ji      	= copy.deepcopy(self.MC_ji)
 		self.org_n_MC_ji    	= copy.deepcopy(self.n_MC_ji)
 
+		if self.tight_duedate_setting is True:
+			self.new_job_indices = copy.deepcopy(self.current_instance.new_job_indices)
+		else:
+			self.new_job_indices = None
+
 	def load_scenario(self, scenario_id):
 		self.current_scenario 	= self.scenarios[scenario_id]
-		self.JA_event 	        = self.current_scenario.JA_event
-		self.MB_event 			= self.current_scenario.MB_event
+		self.JA_event 	        = copy.deepcopy(self.current_scenario.JA_event)
+		self.MB_event 			= copy.deepcopy(self.current_scenario.MB_event)
 		
 	def seed(self, seed=None):
 		random.seed(seed)
@@ -91,7 +100,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 
 		# Calculate estimated tardiness rate
 		Ne_tard = 0
-		Ne_left = 0 if self.t < np.max(self.C_ij) else 1
+		Ne_left = 0
 		for j in range(self.J):
 			if self.n_ops_left_j[j] > 0:
 				Ne_left += self.n_ops_left_j[j]
@@ -102,6 +111,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 					if self.T_cur[j] + T_left > self.d_j[j]:
 						Ne_tard += (self.n_j[j] - i) 
 						break
+		Ne_left = max(Ne_left,1)
 
 		# Calculate actual tardiness rate 
 		Na_tard = 0
@@ -112,7 +122,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 				i = int(self.n_j[j] - self.n_ops_left_j[j]) -1
 				if self.C_ij[i, j] > self.d_j[j]:
 					Na_tard += self.n_ops_left_j[j]
-		
+		Na_left = max(Na_left,1)
 		
 		# Problem size features
 		n_Job  = len(self.JSet)/self.maxJob    				# 1. Number of job left 		- normalize
@@ -205,11 +215,22 @@ class FJSP_under_uncertainties_Env(gym.Env):
 																					self.d_j, self.n_j, self.p_ijk, self.h_ijk, self.J, self.I, self.K,  	\
 																					self.X_ijk, self.S_ij, self.C_ij, self.OperationPool, self.re, self.S_k,\
 																					self.org_J, self.org_p_ijk, self.org_h_ijk, self.org_n_j,               \
-																					self.org_MC_ji, self.org_n_MC_ji, self.C_j                              )																				
+																					self.org_MC_ji, self.org_n_MC_ji, self.C_j, self.master                             )	
+		# # check I
+		# if not (self.p_ijk.shape[0] == self.h_ijk.shape[0] == max(len(sublist) for sublist in self.n_MC_ji) == max(len(sublist) for sublist in self.MC_ji)):
+		# 	print( "I p", self.p_ijk.shape[0], "h", self.h_ijk.shape[0], "n_MC_ji",  max(len(sublist) for sublist in self.n_MC_ji), "MC_ji", max(len(sublist) for sublist in self.MC_ji))
+		# # check J
+		# if not (self.p_ijk.shape[1] == self.h_ijk.shape[1] == len(self.n_MC_ji) == len(self.MC_ji)):
+		# 	print("J p", self.p_ijk.shape[1], "h", self.h_ijk.shape[1], "n_MC_ji", len(self.n_MC_ji), "MC_ji", len(self.MC_ji))
 
+		
 		# --------------------------------- Terminated, Reward,  Observation  ------------------------------------
-		if self.t >= np.max(self.C_ij) or self.triggered_event is None: 
-			self.done = True
+		if self.tight_duedate_setting == True:
+			if len(self.JA_event) == 0 and self.t >= np.max(self.C_ij):
+				self.done = True
+		else:
+			if self.t >= np.max(self.C_ij) or self.triggered_event is None: 
+				self.done = True
 		
 		self.calc_reward()
 		self.calc_observation()
@@ -220,6 +241,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 	"""############################################### R E S E T ##################################################"""
 
 	def reset(self, seed=None, test=None, datatest=None, scenariotest=None):
+		print("DONEEEEEEEEEEEEEEEEEE")
 		if seed is not None:
 			self.seed(seed)
 
@@ -240,18 +262,21 @@ class FJSP_under_uncertainties_Env(gym.Env):
 				self.num_scenario_per_instance +=1
 				self.load_instance(self.instance_id)
 				self.JA_event, self.MB_event = generate_random_event(self.J, self.K, self.planning_horizon, self.WeibullDistribution, 
-																	self.critical_machines, self.ReworkProbability)
+																	self.critical_machines, self.ReworkProbability, 
+																	self.master, self.new_job_indices)
 		else:
 			scenariotest = str(datatest) + scenariotest
 			self.load_instance(datatest)
 			self.load_scenario(scenariotest)
+
+		if self.JA_only_setting == True:
+			self.MB_event = [[] for _ in range(self.K)]
 
 		self.events         = {}
 		self.S_k            = np.zeros((self.K))
 		self.MB_record      = {}
 		self.done 			= False
 		
-
 		# ------------------------------------------ State transition ------------------------------------------
 		# Random event
 		self.JA_event, self.MB_event, self.t, self.triggered_event, \
@@ -270,7 +295,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 																					self.d_j, self.n_j, self.p_ijk, self.h_ijk, self.J, self.I, self.K,  	\
 																					self.X_ijk, self.S_ij, self.C_ij, self.OperationPool, self.re, self.S_k,\
 																					self.org_J, self.org_p_ijk, self.org_h_ijk, self.org_n_j,               \
-																					self.org_MC_ji, self.org_n_MC_ji, self.C_j                              )															
+																					self.org_MC_ji, self.org_n_MC_ji, self.C_j, self.master                 )															
 		self.pre_JSet = copy.deepcopy(self.JSet)	
 
 		# ---------------------------------------------Observation--------------------------------------------

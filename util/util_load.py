@@ -79,8 +79,8 @@ def read_txt(filename):
     return J, I, K, p_ijk, h_ijk, d_j, n_j, MC_ji, n_MC_ji, OperationPool
 
 def read_scenario (file_path, K, critical_machines):
-    JA_event = []
-    MB_event = [[] for _ in range(K)]
+    JA_event  = []
+    MB_event  = [[] for _ in range(K)]
 
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -88,32 +88,45 @@ def read_scenario (file_path, K, critical_machines):
 
         for line in lines:
             if 'Defected Jobs' in line:
-                current_section = 'JA'
+                current_section = 'Defected Jobs'
+                continue
+            elif 'Remaining Jobs' in line:
+                current_section = 'Remaining Jobs'
                 continue
             elif 'MachineBreakdown' in line:
-                current_section = 'MB'
+                current_section = 'MachineBreakdown'
                 continue
             elif line.strip() == '':
                 continue
 
-            if current_section == 'JA':
+            if current_section == 'Defected Jobs':
                 parts = line.split(',')
                 if len(parts) == 3:
                     try:
-                        job_id = int(parts[0].strip())-1
+                        job_id        = int(parts[0].strip())-1
                         deadline_info = int(parts[1].strip())
-                        description = parts[2].strip()
+                        description   = parts[2].strip()
                         JA_event.append((job_id, deadline_info, description))
                     except ValueError:
                         # Skip lines that cannot be converted to integer (likely headers or malformed data)
                         continue
-            elif current_section == 'MB':
+            elif current_section == 'Remaining Jobs':
+                parts = line.split(',')
+                if len(parts) == 3:
+                    try:
+                        component_id = parts[0].strip()
+                        arrival_time = int(parts[1].strip())
+                        deadline     = int(parts[2].strip())
+                        JA_event.append((component_id, arrival_time, deadline))
+                    except ValueError:
+                        continue
+            elif current_section == 'MachineBreakdown':
                 parts = line.split()
                 if len(parts) == 3:
                     try:
-                        machine_id = int(parts[0].strip())
-                        bd_time = float(parts[1].strip())
-                        re_time = float(parts[2].strip())
+                        machine_id  = int  (parts[0].strip())
+                        bd_time     = float(parts[1].strip())
+                        re_time     = float(parts[2].strip())
                         description = "critical" if machine_id in critical_machines else "normal"
                         MB_event[machine_id - 1].append((bd_time, re_time, description))
                     except ValueError:

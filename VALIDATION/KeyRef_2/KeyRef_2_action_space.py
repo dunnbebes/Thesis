@@ -60,7 +60,8 @@ class Method:
         # Find earliest available machine
         available           = np.maximum(self.S_j[j], self.S_k)
 
-        
+        if i >= self.h_ijk.shape[0]:
+            print(j, i, self.h_ijk.shape[0], self.n_j[j], self.n_ops_left_j[j], 0 in self.JSet, "CDR1 ")
         mask                = self.h_ijk[i, j, :] == 1
         
         filtered_available  = available[mask]
@@ -92,7 +93,8 @@ class Method:
         # Find earliest available machine
         available           = np.maximum(self.S_j[j], self.S_k)
 
-        
+        if i >= self.h_ijk.shape[0]:
+            print(j, i, self.h_ijk.shape[0], self.n_j[j], self.n_ops_left_j[j], 0 in self.JSet, "CDR2 ")
         mask                = self.h_ijk[i, j, :] == 1
         
         filtered_available  = available[mask]
@@ -116,11 +118,13 @@ class Method:
         # Select machine
         r = random.random()
         workload = np.full(self.K, np.inf)
+
         for k in self.MC_ji[j][i]:
             workload[k] = np.sum(self.p_ijk[ope, job, k] * self.X_ijk[ope, job, k] for job in range(self.J) for ope in range(int(self.n_j[job] - self.n_ops_left_j[job])) )
         utilization = np.full(self.K, 0) if np.mean(self.S_k) == 0 else workload / np.mean(self.S_k)
 
-        
+        if i >= self.h_ijk.shape[0]:
+            print(j, i, self.h_ijk.shape[0], self.n_j[j], self.n_ops_left_j[j], 0 in self.JSet, "CDR3 ")
         mask = self.h_ijk[i, j, :] == 1
         
         if r < 0.5:           
@@ -148,7 +152,8 @@ class Method:
         # Find earliest available machine
         available           = np.maximum(self.S_j[j], self.S_k)
 
-        
+        if i >= self.h_ijk.shape[0]:
+            print(j, i, self.h_ijk.shape[0], self.n_j[j], self.n_ops_left_j[j], 0 in self.JSet, "CDR4 ")
         mask                = self.h_ijk[i, j, :] == 1
 
         filtered_available  = available[mask]
@@ -179,7 +184,8 @@ class Method:
         # Find earliest available machine
         available           = np.maximum(self.S_j[j], self.S_k)
 
-        
+        if i >= self.h_ijk.shape[0]:
+            print(j, i, self.h_ijk.shape[0], self.n_j[j], self.n_ops_left_j[j], 0 in self.JSet, "CDR5 ")
         mask                = self.h_ijk[i, j, :] == 1
 
         filtered_available  = available[mask]
@@ -201,7 +207,8 @@ class Method:
         # Find earliest available machine
         available           = np.maximum(self.S_j[j], self.S_k)
 
-        
+        if i >= self.h_ijk.shape[0]:
+            print(j, i, self.h_ijk.shape[0], self.n_j[j], self.n_ops_left_j[j], 0 in self.JSet, "CDR6 ")
         mask                = self.h_ijk[i, j, :] == 1
 
         filtered_available  = available[mask]

@@ -571,10 +571,10 @@ class Method:
         StartTime                     = time()
         operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LFOH()
-        print('before encode')
+        #print('before encode')
         OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
                                                         self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
-        print('after encode')
+        #print('after encode')
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
                                                     self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, operations_map,
                                                     self.MC_ji, self.n_MC_ji, OA, MS, chromosome_len, StartTime, self.maxtime)
@@ -585,10 +585,10 @@ class Method:
         StartTime                     = time()
         operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LAPH()
-        print('before encode')
+        #print('before encode')
         OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
                                                         self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
-        print('after encode')
+        #print('after encode')
         GBest, X_ijk, S_ij, C_ij, C_j = TabuSearch (self.S_k, self.S_j, self.JSet, self.J, self.I, self.K, 
                                                     self.p_ijk, self.d_j, self.n_j, self.n_ops_left_j, operations_map,
                                                     self.MC_ji, self.n_MC_ji, OA, MS, chromosome_len, StartTime, self.maxtime)
@@ -599,10 +599,10 @@ class Method:
         StartTime                     = time()
         operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LFOH()
-        print('before encode')
+        #print('before encode')
         OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
                                                         self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
-        print('after encode')
+        #print('after encode')
         current_solution              = (OA, MS)
         population                    = generate_neighborhood(current_solution, self.PopSize, chromosome_len)
         print('after generate')
@@ -618,10 +618,10 @@ class Method:
         StartTime                     = time()
         operations_map                = generate_dictionary_for_MS(self.OperationPool, self.n_j)
         GBest, X_ijk, S_ij, C_ij, C_j = self.LAPH()
-        print('before encode')
+        #print('before encode')
         OA, MS, chromosome_len        = encode_schedule(self.J, self.I, self.n_j, X_ijk, S_ij, self.MC_ji, 
                                                         self.n_MC_ji, self.n_ops_left_j, operations_map, self.t)
-        print('after encode')
+        #print('after encode')
         current_solution              = (OA, MS)
         population                    = generate_neighborhood(current_solution, self.PopSize, chromosome_len)
         print('after generate')
@@ -655,6 +655,7 @@ class Method:
                 j = np.argmin(average_slack)
 
             i                   = self.n_j[j] - self.n_ops_left_j[j]
+            #print(j, i, self.n_j[j], self.n_ops_left_j[j], self.OJSet[j],"\n", self.h_ijk[:, j, :])
             # Find earliest available machine
             available           = np.maximum(self.S_j[j], self.S_k)
             mask                = self.h_ijk[i, j, :] == 1
@@ -710,7 +711,10 @@ class Method:
                     critical_ratio[j] = (self.d_j[j] - self.T_cur[j])/np.sum(p_mean[OP[j]:self.n_j[j], j])
                 j = np.argmin(critical_ratio)
 
+            
             i                   = self.n_j[j] - self.n_ops_left_j[j]
+
+            #print(j, i, self.n_j[j], self.n_ops_left_j[j], self.OJSet[j],"\n", self.h_ijk[:, j, :])
             # Find earliest available machine
             available           = np.maximum(self.S_j[j], self.S_k)
             mask                = self.h_ijk[i, j, :] == 1
@@ -761,6 +765,8 @@ class Method:
                 estimated_tardiness[j] = self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
             j = np.argmax(estimated_tardiness)
             i = self.n_j[j] - self.n_ops_left_j[j]
+
+            #print(j, i, self.n_j[j], self.n_ops_left_j[j], self.OJSet[j],"\n", self.h_ijk[:, j, :])
             # Select machine
             r = random.random()
             workload = np.full(self.K, np.inf)
@@ -816,6 +822,8 @@ class Method:
             # Randomly select a job
             j                   = random.choice(dummy_JSet)
             i                   = self.n_j[j] - self.n_ops_left_j[j]
+
+            #print(j, i, self.n_j[j], self.n_ops_left_j[j], self.OJSet[j],"\n", self.h_ijk[:, j, :])
             # Find earliest available machine
             available           = np.maximum(self.S_j[j], self.S_k)
             mask                = self.h_ijk[i, j, :] == 1
@@ -867,6 +875,8 @@ class Method:
                 j = np.argmin(CompletionRate_slack)
 
             i                   = self.n_j[j] - self.n_ops_left_j[j]
+
+            #print(j, i, self.n_j[j], self.n_ops_left_j[j], self.OJSet[j],"\n", self.h_ijk[:, j, :])
             # Find earliest available machine
             available           = np.maximum(self.S_j[j], self.S_k)
             mask                = self.h_ijk[i, j, :] == 1
@@ -916,6 +926,8 @@ class Method:
                 estimated_tardiness[j] = self.T_cur[j] + np.sum(p_mean[OP[j]:self.n_j[j], j]) - self.d_j[j]
             j = np.argmax(estimated_tardiness)
             i                   = self.n_j[j] - self.n_ops_left_j[j]
+
+            #print(j, i, self.n_j[j], self.n_ops_left_j[j], self.OJSet[j],"\n", self.h_ijk[:, j, :])
             # Find earliest available machine
             available           = np.maximum(self.S_j[j], self.S_k)
             mask                = self.h_ijk[i, j, :] == 1
