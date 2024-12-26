@@ -73,16 +73,16 @@ def random_events(t, K, X_ijk, S_ij, C_ij, S_j, JSet, JA_event, MB_event, S_k, U
 						events.setdefault(new_time, []).append(event)
 
 	events = {key: value for key, value in events.items() if value != []}
-
+	T 	   = max(t, np.min(S_k[UsedMachine]))
 	if events:
 		# print("find events")
 		new_time 		= copy.deepcopy(int(min(events.keys())))
 		triggered_event = copy.deepcopy(events[new_time])
-		T 				= np.min(S_k[UsedMachine])
+		
 		if len(JSet)> 0 and T < new_time:
 			# print("but prioritize assigning jobs", len(JSet))
 			# prioritize assign jobs to machines
-			new_time = np.min(S_j[JSet])
+			new_time = copy.deepcopy(T)
 			MBList = []    
 			triggered_event =[]
 		else:
@@ -99,7 +99,7 @@ def random_events(t, K, X_ijk, S_ij, C_ij, S_j, JSet, JA_event, MB_event, S_k, U
 	else:
 		print("find no events")
 		if JSet:
-			new_time = np.min(S_j[JSet])
+			new_time = copy.deepcopy(T)
 			triggered_event = []
 		else:
 			new_time = np.max(S_j)
@@ -406,10 +406,10 @@ class Luo_DDQN_env(gym.Env):
 
 		while finding == False:
 			# Retrieve new event
-			self.JA_event, self.MB_event, self.new_time, \
+			self.JA_event, self.MB_event, self.t, \
 			self.triggered_event, self.re, self.MBList   = random_events(self.t, self.K, self.X_ijk, self.S_ij, self.C_ij, self.S_j, self.JSet, 
 																		self.JA_event, self.MB_event, self.S_k, self.UsedMachine)
-			
+			self.S_k = np.maximum(self.S_k, self.t)
 			# Handle mannually if uncertain event is a machine breakdown
 			self.handle_machine_breakdown()
 
