@@ -250,24 +250,32 @@ class Luo_DDQN_env(gym.Env):
 			Job_seq = copy.deepcopy(OJSet)
 			Mch_seq = find_Mch_seq(self.K, self.X_ijk, self.C_ij, self.t)
 
-
+			X_mask  =  self.X_ijk.astype(bool)
 			for breakdown_MC in self.MBList:
-				operation		= None
-				lateststarttime = 0
-				Oij_assigned_to_machine = np.argwhere(self.X_ijk[:, :, breakdown_MC])
-				findingoperation = False
-				for i, j in Oij_assigned_to_machine:
-					if findingoperation == True:
-						break
-					if self.S_ij[i, j] >= lateststarttime:
-						
-						if self.C_ij[i, j] > self.t:
-							operation = [i, j]
-							findingoperation = True
-						else:
-							lateststarttime = copy.deepcopy(self.S_ij[i, j])
-						
+				overlap_mask = np.logical_or(
+						np.logical_and(self.S_ij >= self.t        		 		  , self.C_ij <= self.t + self.re[breakdown_MC]),       # in
+						np.logical_and(self.S_ij <= self.t             		      , self.C_ij >  self.t     				   ),       # left
+						np.logical_and(self.S_ij <  self.t + self.re[breakdown_MC], self.C_ij >= self.t + self.re[breakdown_MC]))       # right
+				indices = np.argwhere(X_mask[:, :, breakdown_MC] & overlap_mask[:, :])
+				operation = indices.tolist()
 
+				# operation		= None
+				# lateststarttime = 0
+				# Oij_assigned_to_machine = np.argwhere(self.X_ijk[:, :, breakdown_MC])
+				# findingoperation = False
+				# for i, j in Oij_assigned_to_machine:
+				# 	if findingoperation == True:
+				# 		break
+				# 	if self.S_ij[i, j] >= lateststarttime:
+						
+				# 		if self.C_ij[i, j] > self.t:
+				# 			operation = [i, j]
+				# 			findingoperation = True
+				# 		else:
+				# 			lateststarttime = copy.deepcopy(self.S_ij[i, j])
+				
+				print(operation)
+				operation = operation[0]
 
 				if operation is not None:
 					if len(operation) != 0:
@@ -285,6 +293,7 @@ class Luo_DDQN_env(gym.Env):
 
 				self.S_k[breakdown_MC] = self.t + self.re[breakdown_MC]
 
+				print(operation, Mch_seq[breakdown_MC])
 				id_ope_onMCh     = Mch_seq[breakdown_MC].index(operation)
 				self.X_ijk, self.S_ij, self.C_ij = RightShift(breakdown_MC, id_ope_onMCh, self.S_k[breakdown_MC], Job_seq, Mch_seq, self.X_ijk, self.S_ij, self.C_ij, self.p_ijk, self.n_j)
 				

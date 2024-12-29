@@ -408,6 +408,7 @@ class Method:
         ready_time = min(ORDict)
         ORSet      = copy.deepcopy(ORDict[ready_time])
 
+        print(dummy_JSet, ORSet)
         while Reschedule_completion == False:
             # Initialize cost matrix with a high value
             num_operations = len(ORSet)
@@ -415,6 +416,7 @@ class Method:
 
             # Populate the cost matrix based on constraints
             for op_idx, [i, j] in enumerate(ORSet):
+                print(i, j, self.h_ijk[i, j])
                 for k in range(self.K):
                     if self.h_ijk[i, j, k] == 1:
                         cost_matrix[op_idx, k] = S_k[k] + self.p_ijk[i, j, k]
@@ -424,6 +426,9 @@ class Method:
 
             # Output the assignment results
             assignments = [(ORSet[row], machine) for row, machine in zip(row_ind, col_ind) if cost_matrix[row, machine] < 999**3]
+            if len(assignments) == 0: 
+                print("No assignment")
+                print(cost_matrix)
             new_availabletime = []
             ORDict.pop(ready_time)
             for (i, j), k in assignments:

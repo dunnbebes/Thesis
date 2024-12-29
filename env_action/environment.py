@@ -232,6 +232,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 			if self.t >= np.max(self.C_ij) or self.triggered_event is None: 
 				self.done = True
 		
+		if len(self.JSet) == 0 : print("No JSet")
 		self.calc_reward()
 		self.calc_observation()
 
