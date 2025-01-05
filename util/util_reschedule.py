@@ -150,38 +150,45 @@ def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record
     
     else:
         if events:
+            
             original_time   = copy.deepcopy(int(min(events.keys())))
             triggered_event = copy.deepcopy(events[original_time])
 
             for uncertain_type, k, repair_time, description in triggered_event:
                 if uncertain_type == "MB":
+                    NoOpeOnMachineWhenItBreaksDown = None
+                    event = (uncertain_type, k, repair_time, description)
+                    events[original_time].remove(event)
 
                     mask = X_ijk[:, :, k] == 1  # Boolean array where True indicates assigned to machine k
                     start_times = S_ij[mask]
                     start_times = start_times[start_times >= t]
 
                     if start_times.size > 0:
-                        max_start_time = np.max(start_times)
-
-                        if original_time <= t: 	
-                            new_time = max(max_start_time, original_time)
+                        if original_time <= t: 
+                            max_start_time = np.max(start_times)	
+                            if max_start_time > t:
+                                new_time = max(max_start_time, original_time)
+                            else:
+                                NoOpeOnMachineWhenItBreaksDown = True
                         else: 	
                             new_time = copy.deepcopy(original_time)
-                    
-                        X_mask =  X_ijk.astype(bool)
 
-                        """Find affected operation"""
-                        # Use the boolean mask to find the indices where overlap occurs
-                        overlap_mask = np.logical_or(
-                            np.logical_and(S_ij >= new_time              , C_ij <= new_time + repair_time),       # in
-                            np.logical_and(S_ij <= new_time              , C_ij >  new_time        ),       # left
-                            np.logical_and(S_ij <  new_time + repair_time, C_ij >= new_time + repair_time))       # right
-                        indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :])
 
-                        event = (uncertain_type, k, repair_time, description)
-                        events[original_time].remove(event)
-                        if len(indices) > 0:
-                            events.setdefault(new_time, []).append(event)            
+                        if NoOpeOnMachineWhenItBreaksDown is not True:
+                            X_mask =  X_ijk.astype(bool)
+
+                            """Find affected operation"""
+                            # Use the boolean mask to find the indices where overlap occurs
+                            overlap_mask = np.logical_or(
+                                np.logical_and(S_ij >= new_time              , C_ij <= new_time + repair_time),       # in
+                                np.logical_and(S_ij <= new_time              , C_ij >  new_time        ),       # left
+                                np.logical_and(S_ij <  new_time + repair_time, C_ij >= new_time + repair_time))       # right
+                            indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :])
+
+                            
+                            if len(indices) > 0:
+                                events.setdefault(new_time, []).append(event)            
             
 
         if events: # After While loop, If have events

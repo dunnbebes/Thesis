@@ -106,6 +106,8 @@ class FJSP_under_uncertainties_Env(gym.Env):
 				Ne_left += self.n_ops_left_j[j]
 				T_left = 0
 				for i in self.OJSet[j]: 
+					if i >= self.p_ijk.shape[0] or i>= self.h_ijk.shape[0]:
+						print(i, self.p_ijk.shape, self.h_ijk.shape, self.I, self.J, np.max(self.n_j))
 					t_mean_ij = np.sum(self.p_ijk[i, j]*self.h_ijk[i,j])/np.maximum(np.sum(self.h_ijk[i,j]),1)
 					T_left   += t_mean_ij
 					if self.T_cur[j] + T_left > self.d_j[j]:

@@ -16,9 +16,13 @@ from util.util_action 		 import find_Mch_seq, RightShift
 
 def random_events(t, K, X_ijk, S_ij, C_ij, S_j, JSet, JA_event, MB_event, S_k, UsedMachine):
 	MBList   		= []
+	MB_event_list	= []
 	events   		= {}
 	re       		= np.zeros((K)) 
-	
+	T 	  		    = max(t, np.min(S_k[UsedMachine]))
+
+	operation_dict  = {}
+
 	if all(isinstance(t[2], str) for t in JA_event):
         # Loose duedate setting (New jobs = Rework)
 		for job, deadline, description in JA_event:           
@@ -41,39 +45,54 @@ def random_events(t, K, X_ijk, S_ij, C_ij, S_j, JSet, JA_event, MB_event, S_k, U
 			if time_occur not in events:
 				events[time_occur] = []
 			events[time_occur].append(("MB", k, repair, description))
+			MB_event_list.append((time_occur, k, repair, description ))
     
 	if events:
 		original_time   = copy.deepcopy(int(min(events.keys())))
-		triggered_event = copy.deepcopy(events[original_time])
-		for uncertain_type, k, repair_time, description in triggered_event:
-			if uncertain_type == "MB":
+		if T >= original_time or len(JSet) == 0:
+			# if T >= original_time:
+			# 	print("satisfy T > original time")
+			# else:
+			# 	print("satisfy len(JSet) == 0")
+
+			for original_time, k, repair_time, description in MB_event_list:
+				print("go through checking")
+				NoOpeOnMachineWhenItBreaksDown = None
+				event = ( "MB", k, repair_time, description)
+				events[original_time].remove(event)
+
 				mask = X_ijk[:, :, k] == 1  # Boolean array where True indicates assigned to machine k
 				start_times = S_ij[mask]
 				if start_times.size > 0:
-					max_start_time = np.max(start_times)
-
-					if original_time <= t: 	
-						new_time = max(max_start_time, original_time)
+					
+					if original_time <= t:
+						max_start_time = np.max(start_times)
+						if max_start_time > t: 	
+							new_time = copy.deepcopy(max_start_time)
+						else:
+							NoOpeOnMachineWhenItBreaksDown = True
+						
 					else: 	
 						new_time = copy.deepcopy(original_time)
-					
-					X_mask   =  X_ijk.astype(bool)
-					
-					"""Find affected operation"""
-					# Use the boolean mask to find the indices where overlap occurs
-					overlap_mask = np.logical_or(
-						np.logical_and(S_ij >= new_time        		 , C_ij <= new_time + repair_time),       # in
-						np.logical_and(S_ij <= new_time        		 , C_ij >  new_time        ),       # left
-						np.logical_and(S_ij <  new_time + repair_time, C_ij >= new_time + repair_time))       # right
-					indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :])
 
-					event = (uncertain_type, k, repair_time, description)
-					events[original_time].remove(event)
-					if len(indices) > 0:
-						events.setdefault(new_time, []).append(event)
+					if NoOpeOnMachineWhenItBreaksDown != True:
+						X_mask   =  X_ijk.astype(bool)
+						
+						"""Find affected operation"""
+						# Use the boolean mask to find the indices where overlap occurs
+						overlap_mask = np.logical_or(
+							np.logical_and(S_ij >= new_time        		 , C_ij <= new_time + repair_time),       # in
+							np.logical_and(S_ij <= new_time        		 , C_ij >  new_time        ),      		  # left
+							np.logical_and(S_ij <  new_time + repair_time, C_ij >= new_time + repair_time))       # right
+						indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :]).tolist()
+
+						if len(indices) > 0:
+							events.setdefault(new_time, []).append(event)
+							operation_dict[k] = (new_time, repair_time, indices)
+							print("find breakdownnnnnn")
 
 	events = {key: value for key, value in events.items() if value != []}
-	T 	   = max(t, np.min(S_k[UsedMachine]))
+	
 	if events:
 		# print("find events")
 		new_time 		= copy.deepcopy(int(min(events.keys())))
@@ -93,6 +112,7 @@ def random_events(t, K, X_ijk, S_ij, C_ij, S_j, JSet, JA_event, MB_event, S_k, U
 					# Update remaining JA_event
 					JA_event.remove((partID, time_event, description))
 				else:
+					print("having MB in random_events", partID)
 					MBList.append(partID)
 					MB_event[partID].pop(0)
 					re[partID] = copy.deepcopy(time_event)
@@ -105,7 +125,7 @@ def random_events(t, K, X_ijk, S_ij, C_ij, S_j, JSet, JA_event, MB_event, S_k, U
 			new_time = np.max(S_j)
 			triggered_event = []
 
-	return JA_event, MB_event, new_time, triggered_event, re, MBList
+	return JA_event, MB_event, new_time, triggered_event, re, MBList, operation_dict
 			
 
 class Luo_DDQN_env(gym.Env):
@@ -249,7 +269,8 @@ class Luo_DDQN_env(gym.Env):
 
 			Job_seq = copy.deepcopy(OJSet)
 			Mch_seq = find_Mch_seq(self.K, self.X_ijk, self.C_ij, self.t)
-
+			# print(Mch_seq)
+			# print(self.operation_dict)
 			X_mask  =  self.X_ijk.astype(bool)
 			for breakdown_MC in self.MBList:
 				overlap_mask = np.logical_or(
@@ -257,24 +278,9 @@ class Luo_DDQN_env(gym.Env):
 						np.logical_and(self.S_ij <= self.t             		      , self.C_ij >  self.t     				   ),       # left
 						np.logical_and(self.S_ij <  self.t + self.re[breakdown_MC], self.C_ij >= self.t + self.re[breakdown_MC]))       # right
 				indices = np.argwhere(X_mask[:, :, breakdown_MC] & overlap_mask[:, :])
-				operation = indices.tolist()
-
-				# operation		= None
-				# lateststarttime = 0
-				# Oij_assigned_to_machine = np.argwhere(self.X_ijk[:, :, breakdown_MC])
-				# findingoperation = False
-				# for i, j in Oij_assigned_to_machine:
-				# 	if findingoperation == True:
-				# 		break
-				# 	if self.S_ij[i, j] >= lateststarttime:
-						
-				# 		if self.C_ij[i, j] > self.t:
-				# 			operation = [i, j]
-				# 			findingoperation = True
-				# 		else:
-				# 			lateststarttime = copy.deepcopy(self.S_ij[i, j])
-				
+				operation = indices.tolist()				
 				print(operation)
+				print(Mch_seq[breakdown_MC])
 				operation = operation[0]
 
 				if operation is not None:
@@ -293,7 +299,7 @@ class Luo_DDQN_env(gym.Env):
 
 				self.S_k[breakdown_MC] = self.t + self.re[breakdown_MC]
 
-				print(operation, Mch_seq[breakdown_MC])
+				# print(operation, Mch_seq[breakdown_MC])
 				id_ope_onMCh     = Mch_seq[breakdown_MC].index(operation)
 				self.X_ijk, self.S_ij, self.C_ij = RightShift(breakdown_MC, id_ope_onMCh, self.S_k[breakdown_MC], Job_seq, Mch_seq, self.X_ijk, self.S_ij, self.C_ij, self.p_ijk, self.n_j)
 				
@@ -318,7 +324,7 @@ class Luo_DDQN_env(gym.Env):
 		for job_info, info1, info2 in JA: 
 			"""Adjust the dataset"""              
 			self.J += 1
-			self.count +=1
+			self.countjobleft +=1
 			if all(isinstance(t[2], str) for t in JA):
 				#Loose duedate setting
 				jobresemble = copy.deepcopy(job_info)
@@ -392,6 +398,7 @@ class Luo_DDQN_env(gym.Env):
 	"""################################################ S T E P ###################################################"""
 	def step(self, action):
 		# ----------------------------------------------Action------------------------------------------------
+		print("1. action")
 		action_method                   = self.perform_action()					    
 		operation_machine_selection     = action_method[action]
 		i, j, k                         = operation_machine_selection()
@@ -407,22 +414,22 @@ class Luo_DDQN_env(gym.Env):
             
 		else:
 			self.JSet.remove(j)
-
-		if j == 0:
-			print(self.n_ops_left_j[0], 0 in self.JSet)
 		
 		finding = False
-
+		# print("2. while loop, finding new event")
 		while finding == False:
 			# Retrieve new event
 			self.JA_event, self.MB_event, self.t, \
-			self.triggered_event, self.re, self.MBList   = random_events(self.t, self.K, self.X_ijk, self.S_ij, self.C_ij, self.S_j, self.JSet, 
+			self.triggered_event, self.re, self.MBList,\
+			self.operation_dict   						= random_events(self.t, self.K, self.X_ijk, self.S_ij, self.C_ij, self.S_j, self.JSet, 
 																		self.JA_event, self.MB_event, self.S_k, self.UsedMachine)
 			self.S_k = np.maximum(self.S_k, self.t)
 			# Handle mannually if uncertain event is a machine breakdown
+			# print("3. handle machine breakdown")
 			self.handle_machine_breakdown()
 
 			# Job Arrival
+			# print("4. handle job arrival")
 			self.handle_job_arrival()
 
 			if not(len(self.JSet) == 0 and len(self.JA_event)> 0):
@@ -432,19 +439,24 @@ class Luo_DDQN_env(gym.Env):
 		
 		# --------------------------------- Terminated, Reward,  Observation  ------------------------------------
 		
+		# print("5. check for terminate")
 		
 		if len(self.JSet) == 0 and len(self.JA_event) == 0:
 			print("====== Done ======")
 			self.done = True
 			self.tardiness = self.calc_tardiness()
 		else: 
-			if self.count >= 70:
-				self.count = 0
-				print (self.count, "There are", len(self.JA_event), "jobs left")
+			if self.countjobleft >= 5:
+				self.countjobleft = 0
+				print (self.countjobleft, "There are", len(self.JA_event), "jobs left")
 		
-		if len(self.JSet) < 1: print("JSet contains", len(self.JSet), "elements while JA_event contains", len(self.JA_event), self.done)
+		# print("6. observation")
 		self.calc_observation()
+		# print("7. reward")
 		self.calc_reward()
+
+		print("8. End step")
+
 
 		return self.observation, self.reward, self.done, False, {}
 	
@@ -518,6 +530,7 @@ class Luo_DDQN_env(gym.Env):
 		# ---------------------------------------------Observation--------------------------------------------
 		self.observation = np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
 
-		self.count = 0
+		self.countjobleft = 0
+
 		return self.observation, {}
 	

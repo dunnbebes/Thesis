@@ -43,7 +43,7 @@ def read_txt(filename):
     # Extracting parameters J, K, I
     J = int(data[0].strip())  # Number of jobs
     K = int(data[1].strip())  # Number of machines
-    I = max(map(int, data[2].strip().split()))  # Maximum number of operations per job
+    I = max(max(map(int, data[2].strip().split())), 7)  # Maximum number of operations per job
     d_j = np.array(list(map(int, data[3].strip().split())), dtype=int)
 
     # Initialize p_ijk matrix, n_j vector, and MC_ji list of lists

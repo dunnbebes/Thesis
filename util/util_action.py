@@ -24,14 +24,14 @@ def RightShift (Mch, id_ope_onMch, time_available, dummy_Job_seq, dummy_Mch_seq,
     i   = Oij[0]
     j   = Oij[1]
 
-    if time_available <= dummy_Sij[i][j]:
+    if time_available <= dummy_Sij[i,j]:
         return dummy_Xijk, dummy_Sij, dummy_Cij
     else:
         # Define new start time and end time of operation Oij
-        if time_available > dummy_Sij[i][j]:
-            dummy_Sij[i][j]   = copy.deepcopy(time_available)
-            dummy_Cij[i][j]   = time_available + p_ijk[i][j][Mch]
-        next_time_available   = copy.deepcopy(dummy_Cij[i][j])
+        if time_available > dummy_Sij[i,j]:
+            dummy_Sij[i,j]   = copy.deepcopy(time_available)
+            dummy_Cij[i,j]   = time_available + p_ijk[i,j,Mch]
+        next_time_available   = copy.deepcopy(dummy_Cij[i,j])
 
         # Consider successing operation on the same Machine
         if id_ope_onMch < len(dummy_Mch_seq[Mch]) -1:
