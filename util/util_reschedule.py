@@ -119,6 +119,7 @@ def change_dataset(p_ijk, h_ijk, X_ijk, S_ij, C_ij, MC_ji, n_MC_ji, n_j, j, i, p
 def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record):
     events          = {}
     new_time        = np.max(C_j)
+    MB_event_list   = []
 
     if all(isinstance(t[2], str) for t in JA_event):
         # Loose duedate setting (New jobs = Rework)
@@ -142,6 +143,7 @@ def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record
             if time_occur not in events:
                 events[time_occur] = []
             events[time_occur].append(("MB", k, repair, description))
+            MB_event_list.append((time_occur, k, repair, description ))
     
     re = np.zeros((K)) 
     if len(events) == 0 or (new_time > np.max(C_j) and not JA_event):
@@ -149,47 +151,47 @@ def random_events(t, J, K, X_ijk, S_ij, C_ij, C_j, JA_event, MB_event, MB_record
         triggered_event = None
     
     else:
-        if events:
+        if MB_event_list:
             
-            original_time   = copy.deepcopy(int(min(events.keys())))
-            triggered_event = copy.deepcopy(events[original_time])
+            # original_time   = copy.deepcopy(int(min(events.keys())))
+            # triggered_event = copy.deepcopy(events[original_time])
 
-            for uncertain_type, k, repair_time, description in triggered_event:
-                if uncertain_type == "MB":
-                    NoOpeOnMachineWhenItBreaksDown = None
-                    event = (uncertain_type, k, repair_time, description)
-                    events[original_time].remove(event)
+            for original_time, k, repair_time, description in MB_event_list:
+                NoOpeOnMachineWhenItBreaksDown = None
+                event = ("MB", k, repair_time, description)
+                events[original_time].remove(event)
 
-                    mask = X_ijk[:, :, k] == 1  # Boolean array where True indicates assigned to machine k
-                    start_times = S_ij[mask]
-                    start_times = start_times[start_times >= t]
+                mask = X_ijk[:, :, k] == 1  # Boolean array where True indicates assigned to machine k
+                start_times = S_ij[mask]
+                start_times = start_times[start_times >= t]
 
-                    if start_times.size > 0:
-                        if original_time <= t: 
-                            max_start_time = np.max(start_times)	
-                            if max_start_time > t:
-                                new_time = max(max_start_time, original_time)
-                            else:
-                                NoOpeOnMachineWhenItBreaksDown = True
-                        else: 	
-                            new_time = copy.deepcopy(original_time)
+                if start_times.size > 0:
+                    if original_time <= t: 
+                        max_start_time = np.max(start_times)	
+                        if max_start_time > t:
+                            new_time = max(max_start_time, original_time)
+                        else:
+                            NoOpeOnMachineWhenItBreaksDown = True
+                    else: 	
+                        new_time = copy.deepcopy(original_time)
 
 
-                        if NoOpeOnMachineWhenItBreaksDown is not True:
-                            X_mask =  X_ijk.astype(bool)
+                    if NoOpeOnMachineWhenItBreaksDown is not True:
+                        X_mask =  X_ijk.astype(bool)
 
-                            """Find affected operation"""
-                            # Use the boolean mask to find the indices where overlap occurs
-                            overlap_mask = np.logical_or(
-                                np.logical_and(S_ij >= new_time              , C_ij <= new_time + repair_time),       # in
-                                np.logical_and(S_ij <= new_time              , C_ij >  new_time        ),       # left
-                                np.logical_and(S_ij <  new_time + repair_time, C_ij >= new_time + repair_time))       # right
-                            indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :])
+                        """Find affected operation"""
+                        # Use the boolean mask to find the indices where overlap occurs
+                        overlap_mask = np.logical_or(
+                            np.logical_and(S_ij >= new_time              , C_ij <= new_time + repair_time),       # in
+                            np.logical_and(S_ij <= new_time              , C_ij >  new_time        ),       # left
+                            np.logical_and(S_ij <  new_time + repair_time, C_ij >= new_time + repair_time))       # right
+                        indices = np.argwhere(X_mask[:, :, k] & overlap_mask[:, :])
 
-                            
-                            if len(indices) > 0:
-                                events.setdefault(new_time, []).append(event)            
+                        
+                        if len(indices) > 0:
+                            events.setdefault(new_time, []).append(event)            
             
+        events = {key: value for key, value in events.items() if value != []}
 
         if events: # After While loop, If have events
             new_time        = copy.deepcopy(int(min(events.keys())))
@@ -444,6 +446,8 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
                             # check J
                             if not (p_ijk.shape[1] == h_ijk.shape[1] == len(n_MC_ji) == len(MC_ji)):
                                 print("after break for urgent JA J p", p_ijk.shape[1], "h", h_ijk.shape[1], "n_MC_ji", len(n_MC_ji), "MC_ji", len(MC_ji))
+    
+
     S_j = np.zeros((J))
     if triggered_event is not None:
         for j in JSet:

@@ -56,7 +56,7 @@ def random_events(t, K, X_ijk, S_ij, C_ij, S_j, JSet, JA_event, MB_event, S_k, U
 			# 	print("satisfy len(JSet) == 0")
 
 			for original_time, k, repair_time, description in MB_event_list:
-				print("go through checking")
+				# print("go through checking")
 				NoOpeOnMachineWhenItBreaksDown = None
 				event = ( "MB", k, repair_time, description)
 				events[original_time].remove(event)
@@ -398,7 +398,7 @@ class Luo_DDQN_env(gym.Env):
 	"""################################################ S T E P ###################################################"""
 	def step(self, action):
 		# ----------------------------------------------Action------------------------------------------------
-		print("1. action")
+		# print("1. action")
 		action_method                   = self.perform_action()					    
 		operation_machine_selection     = action_method[action]
 		i, j, k                         = operation_machine_selection()
@@ -446,7 +446,7 @@ class Luo_DDQN_env(gym.Env):
 			self.done = True
 			self.tardiness = self.calc_tardiness()
 		else: 
-			if self.countjobleft >= 5:
+			if self.countjobleft >= 50:
 				self.countjobleft = 0
 				print (self.countjobleft, "There are", len(self.JA_event), "jobs left")
 		
@@ -455,7 +455,7 @@ class Luo_DDQN_env(gym.Env):
 		# print("7. reward")
 		self.calc_reward()
 
-		print("8. End step")
+		# print("8. End step")
 
 
 		return self.observation, self.reward, self.done, False, {}
