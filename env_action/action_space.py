@@ -676,7 +676,11 @@ class Method:
             self.S_k[k]         = copy.deepcopy(C_ij[i, j])
 
             # Adjust the set
-            self.OJSet[j].remove(i)
+            if i not in self.OJSet[j]:
+                print("ERROR ---------------", i, j, self.OJSet[j], self.n_j[j], self.n_ops_left_j[j])
+                self.OJSet[j].pop(0)
+            else:
+                self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
@@ -734,7 +738,11 @@ class Method:
             C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
             self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             # Adjust the set
-            self.OJSet[j].remove(i)
+            if i not in self.OJSet[j]:
+                print("ERROR ---------------", i, j, self.OJSet[j], self.n_j[j], self.n_ops_left_j[j])
+                self.OJSet[j].pop(0)
+            else:
+                self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
@@ -799,7 +807,11 @@ class Method:
             self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             
             # Adjust the set
-            self.OJSet[j].remove(i)
+            if i not in self.OJSet[j]:
+                print("ERROR ---------------", i, j, self.OJSet[j], self.n_j[j], self.n_ops_left_j[j])
+                self.OJSet[j].pop(0)
+            else:
+                self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
@@ -843,7 +855,11 @@ class Method:
             C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
             self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             # Adjust the set
-            self.OJSet[j].remove(i)
+            if i not in self.OJSet[j]:
+                print("ERROR ---------------", i, j, self.OJSet[j], self.n_j[j], self.n_ops_left_j[j])
+                self.OJSet[j].pop(0)
+            else:
+                self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
@@ -896,7 +912,11 @@ class Method:
             C_ij[i, j]          = S_ij[i, j] + self.p_ijk[i, j, k]  
             self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             # Adjust the set
-            self.OJSet[j].remove(i)
+            if i not in self.OJSet[j]:
+                print("ERROR ---------------", i, j, self.OJSet[j], self.n_j[j], self.n_ops_left_j[j])
+                self.OJSet[j].pop(0)
+            else:
+                self.OJSet[j].remove(i)
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)
@@ -948,7 +968,12 @@ class Method:
             self.S_k[k]         = copy.deepcopy(C_ij[i, j])
             
             # Adjust the set
-            self.OJSet[j].remove(i)
+            if i not in self.OJSet[j]:
+                print("ERROR ---------------", i, j, self.OJSet[j], self.n_j[j], self.n_ops_left_j[j])
+                self.OJSet[j].pop(0)
+            else:
+                self.OJSet[j].remove(i)
+
             self.n_ops_left_j[j] -= 1
             if len(self.OJSet[j]) == 0:
                 dummy_JSet.remove(j)

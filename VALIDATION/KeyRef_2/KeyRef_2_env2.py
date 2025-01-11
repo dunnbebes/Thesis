@@ -26,7 +26,7 @@ def random_events(t, K, X_ijk, S_ij, C_ij, S_j, JSet, JA_event, MB_event, S_k, U
 	if all(isinstance(t[2], str) for t in JA_event):
         # Loose duedate setting (New jobs = Rework)
 		for job, deadline, description in JA_event:           
-			time_occur  = copy.deepcopy(np.maximum(C_ij[:, job]))
+			time_occur  = copy.deepcopy(np.max(C_ij[:, job]))
 			if time_occur not in events:
 				events[time_occur] = []
 			events[time_occur].append(("JA", job, deadline, description))
@@ -483,11 +483,15 @@ class Luo_DDQN_env(gym.Env):
 			self.d_j, self.n_j, self.MC_ji, self.n_MC_ji,  \
 			self.OperationPool      	 = read_txt(data_path)
 
-			remaining_info_file = f'{self.directory}/Case{CaseID}_{self.planning_horizon // 60}_InfoNewJob.pkl'
-			with open(remaining_info_file, 'rb') as f:
-				remaining_batches = pickle.load(f)
+			if self.tight_duedate_setting:
+				remaining_info_file = f'{self.directory}/Case{CaseID}_{self.planning_horizon // 60}_InfoNewJob.pkl'
+				with open(remaining_info_file, 'rb') as f:
+					remaining_batches = pickle.load(f)
 
-			new_job_indices = [comp_id for comp_id, qty in remaining_batches.items() for _ in range(qty)]
+				new_job_indices = [comp_id for comp_id, qty in remaining_batches.items() for _ in range(qty)]
+			else:
+				new_job_indices = None
+
 			self.JA_event, self.MB_event = generate_random_event(self.J, self.K, self.planning_horizon, self.WeibullDistribution, 
 																	self.critical_machines, self.ReworkProbability, 
 																	self.master, new_job_indices)

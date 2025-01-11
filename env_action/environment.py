@@ -190,6 +190,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 
 		# ----------------------------------------------Action------------------------------------------------
 		method = self.method_list[action]
+		# method = self.method_list[9]
 		# print("-------------------------------------------------")
 		print(f'Method selection:                    {method}')
 		
