@@ -485,6 +485,8 @@ def snapshot(t, triggered_event, MC_ji, n_MC_ji,                 \
 
     print(JA_boolean, JA_long_boolean, JA_urgent_boolean, "----", MB_boolean, MB_critical_boolean, sum_re)
 
+    if len(JSet) == 0: print("JSet is empty!??")
+
     return  S_k, S_j, J, I, JSet, OJSet, DSet, ODSet, OperationPool, \
             n_ops_left_j, MC_ji, n_MC_ji, d_j, n_j, p_ijk, h_ijk,    \
             org_p_ijk, org_h_ijk, org_n_j, org_MC_ji, org_n_MC_ji,   \

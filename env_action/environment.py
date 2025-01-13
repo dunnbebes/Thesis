@@ -45,7 +45,8 @@ class FJSP_under_uncertainties_Env(gym.Env):
 						  				"CDR1", "CDR2", "CDR3", "CDR5", "CDR6",
 										"RCRS"]
 
-		self.action_space = spaces.Discrete(15)
+		# self.action_space = spaces.Discrete(15)
+		self.action_space = spaces.Discrete(3)
 		self.observation_space = spaces.Box(low=0, high=2,
 											shape=(16,), dtype=np.float32)
 
@@ -189,13 +190,15 @@ class FJSP_under_uncertainties_Env(gym.Env):
 		self.X_previous, self.S_previous, self.C_previous = store_schedule(self.X_ijk, self.S_ij, self.C_ij)
 
 		# ----------------------------------------------Action------------------------------------------------
-		method = self.method_list[action]
+		selected_action = action if self.fixedaction is None else self.fixedaction
+		selected_action +=2
+		method = self.method_list[selected_action]
 		# method = self.method_list[9]
 		# print("-------------------------------------------------")
 		print(f'Method selection:                    {method}')
 		
 		action_method                                = self.perform_action()					    
-		reschedule							         = copy.deepcopy(action_method[action])
+		reschedule							         = copy.deepcopy(action_method[selected_action])
 		self.GBest, \
 		self.X_ijk, self.S_ij, self.C_ij, self.C_j   = reschedule()		
 
@@ -232,7 +235,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 			if len(self.JA_event) == 0 and self.t >= np.max(self.C_ij):
 				self.done = True
 		else:
-			if self.t >= np.max(self.C_ij) or self.triggered_event is None: 
+			if self.t >= np.max(self.C_ij) or self.triggered_event is None or len(self.JSet) == 0: 
 				self.done = True
 		
 		if len(self.JSet) == 0 : print("No JSet")
@@ -244,12 +247,15 @@ class FJSP_under_uncertainties_Env(gym.Env):
 
 	"""############################################### R E S E T ##################################################"""
 
-	def reset(self, seed=None, test=None, datatest=None, scenariotest=None):
+	def reset(self, seed=None, test=None, datatest=None, scenariotest=None, fixedaction=None):
 		print("DONEEEEEEEEEEEEEEEEEE")
 		if seed is not None:
 			self.seed(seed)
 
 		super().reset(seed=seed)
+
+		self.fixedaction = copy.deepcopy(fixedaction)
+
 		# Reset input
 		self.t                  	   = 0
 		if test is None:
@@ -304,5 +310,7 @@ class FJSP_under_uncertainties_Env(gym.Env):
 
 		# ---------------------------------------------Observation--------------------------------------------
 		self.calc_observation()
-
+		print("num jobs", self.J)
+		print("JA_event", self.JA_event)
+		print("MB_event", self.MB_event)
 		return self.observation, {}

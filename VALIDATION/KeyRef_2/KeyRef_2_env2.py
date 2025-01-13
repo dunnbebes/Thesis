@@ -89,7 +89,7 @@ def random_events(t, K, X_ijk, S_ij, C_ij, S_j, JSet, JA_event, MB_event, S_k, U
 						if len(indices) > 0:
 							events.setdefault(new_time, []).append(event)
 							operation_dict[k] = (new_time, repair_time, indices)
-							print("find breakdownnnnnn")
+							# print("find breakdownnnnnn")
 
 	events = {key: value for key, value in events.items() if value != []}
 	
@@ -117,7 +117,7 @@ def random_events(t, K, X_ijk, S_ij, C_ij, S_j, JSet, JA_event, MB_event, S_k, U
 					MB_event[partID].pop(0)
 					re[partID] = copy.deepcopy(time_event)
 	else:
-		print("find no events")
+		# print("find no events")
 		if JSet:
 			new_time = copy.deepcopy(T)
 			triggered_event = []
@@ -295,21 +295,44 @@ class Luo_DDQN_env(gym.Env):
 							self.p_ijk, self.h_ijk, self.X_ijk, self.S_ij, self.C_ij, \
 							self.MC_ji, self.n_MC_ji, self.n_j, self.I, self.org_p_ijk, self.org_h_ijk	= change_dataset(self.p_ijk, self.h_ijk, self.X_ijk, self.S_ij, self.C_ij, \
 																											self.MC_ji, self.n_MC_ji, self.n_j, j, i, processed, self.I, self.K, self.org_p_ijk, self.org_h_ijk)
-							
+							if j not in self.JSet:
+								self.JSet.append(j)
 
 				self.S_k[breakdown_MC] = self.t + self.re[breakdown_MC]
 
-				# print(operation, Mch_seq[breakdown_MC])
-				id_ope_onMCh     = Mch_seq[breakdown_MC].index(operation)
-				self.X_ijk, self.S_ij, self.C_ij = RightShift(breakdown_MC, id_ope_onMCh, self.S_k[breakdown_MC], Job_seq, Mch_seq, self.X_ijk, self.S_ij, self.C_ij, self.p_ijk, self.n_j)
-				
-				self.S_k = np.zeros(self.K)
-				for k in range(self.K):
-					indices = np.where(self.X_ijk[:, :, k] == 1)
-					completion_times = self.C_ij[indices]
-					self.S_k[k] = np.max(completion_times) if len(completion_times) > 0 else 0
+				# id_ope_onMCh     = Mch_seq[breakdown_MC].index(operation)
+				# self.X_ijk, self.S_ij, self.C_ij = RightShift(breakdown_MC, id_ope_onMCh, self.S_k[breakdown_MC], Job_seq, Mch_seq, self.X_ijk, self.S_ij, self.C_ij, self.p_ijk, self.n_j)
+					
+			
+			# Remove scheduled
+			
+			mask = self.S_ij >= self.t
 
-				self.S_j = np.max(self.C_ij, axis=0)
+			self.S_ij[mask] = 0
+			self.C_ij[mask] = 0
+			self.X_ijk[mask] = 0
+
+
+			OJSet = [[] for _ in range(self.J)]
+			for j in self.JSet:
+				OJSet[j] = np.where(self.C_ij[:int(self.n_j[j]), j] == 0)[0].tolist()
+
+			self.n_ops_left_j = np.array([len(sublist) for sublist in OJSet])
+			##
+
+			self.S_k = np.zeros(self.K)
+			for k in range(self.K):
+				indices = np.where(self.X_ijk[:, :, k] == 1)
+				completion_times = self.C_ij[indices]
+				self.S_k[k] = np.max(completion_times) if len(completion_times) > 0 else 0
+
+			self.S_j = np.max(self.C_ij, axis=0)
+
+			for j in self.JSet:
+				i = self.n_j[j] - self.n_ops_left_j[j]
+				self.T_cur[j] = np.mean(self.S_k[self.h_ijk[i+1,j] == 1])
+
+
 
 		return 
 	
@@ -399,8 +422,10 @@ class Luo_DDQN_env(gym.Env):
 	def step(self, action):
 		# ----------------------------------------------Action------------------------------------------------
 		# print("1. action")
+		selected_action = action if self.fixedaction is None else self.fixedaction
+
 		action_method                   = self.perform_action()					    
-		operation_machine_selection     = action_method[action]
+		operation_machine_selection     = action_method[selected_action]
 		i, j, k                         = operation_machine_selection()
 		self.X_ijk[i, j, k]             = 1
 		self.S_ij[i, j]                 = max(self.S_j[j], self.S_k[k])
@@ -463,7 +488,10 @@ class Luo_DDQN_env(gym.Env):
 
 	"""############################################### R E S E T ##################################################"""
 
-	def reset(self, seed=None, test=None, datatest=None, scenariotest=None):
+	def reset(self, seed=None, test=None, datatest=None, scenariotest=None, fixedaction=None):
+
+		self.fixedaction = copy.deepcopy(fixedaction)
+
 		if seed is not None:
 			self.seed(seed)
 
@@ -535,6 +563,9 @@ class Luo_DDQN_env(gym.Env):
 		self.observation = np.array([0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
 
 		self.countjobleft = 0
+
+		print("JA_event", self.JA_event)
+		print("MB_event", self.MB_event)
 
 		return self.observation, {}
 	
